@@ -1346,7 +1346,7 @@
                                 value={formData.dueDate}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
-                                required={formData.repaymentType !== '純繳利息'}
+                                required={formData.repaymentType === '純繳利息'}
                                 disabled={formData.repaymentType === '純繳利息'} // 純繳利息時禁用
                             />
                         </div>
@@ -1602,10 +1602,8 @@
                         ownerId: user.uid, // Assign owner ID
                     });
                     console.log("Added borrower to path:", docRef.path); // Log the path
-                    // CORRECTED: Use docRef.id for the new borrower's ID in local state
-                    // The onFirestoreSnapshot listener will handle updating the state with the correct ID from Firestore,
-                    // so we don't need to manually update `setBorrowers` here with `docRef.id`.
-                    // This prevents potential duplicate entries in local state if the snapshot arrives quickly.
+                    // REMOVED: Manual setBorrowers update here.
+                    // The onFirestoreSnapshot listener will handle updating the state with the correct ID from Firestore.
                     setMessage('借款人新增成功！');
                     setShowForm(false);
                 } catch (error) {
