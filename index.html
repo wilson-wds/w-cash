@@ -1603,7 +1603,9 @@
                     });
                     console.log("Added borrower to path:", docRef.path); // Log the path
                     // CORRECTED: Use docRef.id for the new borrower's ID in local state
-                    setBorrowers(prevBorrowers => [...prevBorrowers, { ...newBorrower, id: docRef.id, transactions: newBorrower.transactions || [], events: newBorrower.events || [] }]);
+                    // The onFirestoreSnapshot listener will handle updating the state with the correct ID from Firestore,
+                    // so we don't need to manually update `setBorrowers` here with `docRef.id`.
+                    // This prevents potential duplicate entries in local state if the snapshot arrives quickly.
                     setMessage('借款人新增成功！');
                     setShowForm(false);
                 } catch (error) {
