@@ -44,7 +44,7 @@
 
         // Firebase Configuration provided by the user
         const firebaseConfig = {
-            apiKey: "AIzaSyAOThGcQEjYqwEjYqwEkKSx5fTNuW4TcIEXV5Dc", // Fixed: Corrected apiKey
+            apiKey: "AIzaSyAOThGcQEjYqwEkKSx5fTNuW4TcIEXV5Dc", // Corrected apiKey based on user's input
             authDomain: "cashcrm-cd6f8.firebaseapp.com",
             projectId: "cashcrm-cd6f8",
             storageBucket: "cashcrm-cd6f8.firebasestorage.app",
@@ -120,7 +120,10 @@
                     alert('登入請求被取消或重複發送。請稍後再試。');
                 } else if (error.code === 'auth/unauthorized-domain') {
                     alert('未經授權的網域。請將此應用程式的網域添加到 Firebase 專案的授權網域列表中。');
-                } else {
+                } else if (error.code === 'auth/api-key-not-valid') { // Specific handling for API key error
+                    alert('API 金鑰無效。請檢查 Firebase 配置中的 API 金鑰是否正確。');
+                }
+                else {
                     alert(`Google 登入失敗: ${error.message}`);
                 }
                 console.error("Google sign-in failed:", error);
