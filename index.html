@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小額借款CRM</title>
+    <title>小CRM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -82,20 +82,17 @@
                     });
 
                     // Try to sign in with custom token if available (Canvas environment)
+                    // Removed explicit signInAnonymously call here to avoid admin-restricted-operation error
                     if (initialAuthToken) {
                         try {
                             await signInWithCustomToken(auth, initialAuthToken);
                             console.log("Signed in with custom token.");
                         } catch (error) {
-                            console.warn("Custom token sign-in failed, attempting anonymous sign-in:", error);
-                            await signInAnonymously(auth);
-                            console.log("Signed in anonymously after custom token failure.");
+                            console.warn("Custom token sign-in failed:", error);
+                            // Do not attempt anonymous sign-in here to avoid auth/admin-restricted-operation
+                            // Instead, let the user manually sign in with Google.
                         }
-                    } else if (!auth.currentUser) { // If no custom token and no current user, sign in anonymously
-                        await signInAnonymously(auth);
-                        console.log("Signed in anonymously.");
                     }
-
                 }
             } catch (error) {
                 console.error("Firebase initialization or authentication failed:", error);
