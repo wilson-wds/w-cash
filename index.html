@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小CRM</title>
+    <title>小額借款CRM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -37,147 +37,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Configuration provided by the user
-        const firebaseConfig = {
-            apiKey: "AIzaSyAOThGcQEjYqwEkKSx5fTNuW4TcIEXV5Dc", // Corrected apiKey based on user's input
-            authDomain: "cashcrm-cd6f8.firebaseapp.com",
-            projectId: "cashcrm-cd6f8",
-            storageBucket: "cashcrm-cd6f8.firebasestorage.app",
-            messagingSenderId: "358067975632",
-            appId: "1:358067975632:web:fc3bb4abc715e8476235d5"
-        };
-        // Use projectId as the appId for collection paths as per Canvas guidelines
-        const canvasAppId = firebaseConfig.projectId;
-
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Initialize Firebase
-        let app;
-        let db;
-        let auth;
-        let currentUserId = null;
-
-        // Function to initialize Firebase and authenticate
-        const initFirebaseAndAuth = async () => {
-            try {
-                if (!app) { // Only initialize if not already initialized
-                    app = initializeApp(firebaseConfig);
-                    auth = getAuth(app);
-                    db = getFirestore(app);
-
-                    // Handle initial authentication state
-                    onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            currentUserId = user.uid;
-                            console.log("Auth state changed. User ID:", currentUserId);
-                        } else {
-                            currentUserId = null;
-                            console.log("User signed out or not authenticated.");
-                        }
-                    });
-
-                    // Try to sign in with custom token if available (Canvas environment)
-                    // Removed explicit signInAnonymously call here to avoid admin-restricted-operation error
-                    if (initialAuthToken) {
-                        try {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                            console.log("Signed in with custom token.");
-                        } catch (error) {
-                            console.warn("Custom token sign-in failed:", error);
-                            // Do not attempt anonymous sign-in here to avoid auth/admin-restricted-operation
-                            // Instead, let the user manually sign in with Google.
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Firebase initialization or authentication failed:", error);
-            }
-        };
-
-        // Google Sign-in function
-        const signInWithGoogle = async () => {
-            if (!auth) {
-                console.error("Firebase Auth not initialized.");
-                return;
-            }
-            const provider = new GoogleAuthProvider();
-            try {
-                await signInWithPopup(auth, provider);
-                console.log("Signed in with Google.");
-            } catch (error) {
-                // More specific error handling for popup issues
-                if (error.code === 'auth/popup-closed-by-user') {
-                    alert('登入視窗被關閉。請確保沒有彈出視窗阻擋器，並允許登入視窗。');
-                } else if (error.code === 'auth/cancelled-popup-request') {
-                    alert('登入請求被取消或重複發送。請稍後再試。');
-                } else if (error.code === 'auth/unauthorized-domain') {
-                    alert('未經授權的網域。請將此應用程式的網域添加到 Firebase 專案的授權網域列表中。');
-                } else if (error.code === 'auth/api-key-not-valid') { // Specific handling for API key error
-                    alert('API 金鑰無效。請檢查 Firebase 配置中的 API 金鑰是否正確。');
-                }
-                else {
-                    alert(`Google 登入失敗: ${error.message}`);
-                }
-                console.error("Google sign-in failed:", error);
-            }
-        };
-
-        // Sign out function
-        const signOutUser = async () => {
-            if (!auth) {
-                console.error("Firebase Auth not initialized.");
-                return;
-            }
-            try {
-                await signOut(auth);
-                console.log("User signed out.");
-            } catch (error) {
-                console.error("Sign out failed:", error);
-            }
-        };
-
-
-        // Call initialization
-        initFirebaseAndAuth();
-
-        // Make Firebase instances and functions available globally for the Babel script
-        window.firebaseApp = app;
-        window.firebaseDb = db;
-        window.firebaseAuth = auth;
-        window.getCurrentUserId = () => currentUserId;
-        // Corrected helper functions for Firestore references
-        window.getBorrowersCollectionRef = (userId) => {
-            if (!db || !window.canvasAppId || !userId) {
-                console.error("getBorrowersCollectionRef: Firestore DB, appId, or userId not available.", {db: !!db, canvasAppId: window.canvasAppId, userId: userId});
-                return null;
-            }
-            return collection(db, 'artifacts', window.canvasAppId, 'users', userId, 'borrowers');
-        };
-
-        window.getBorrowerDocRef = (userId, borrowerId) => {
-            if (!db || !window.canvasAppId || !userId || !borrowerId) {
-                console.error("getBorrowerDocRef: Firestore DB, appId, userId, or borrowerId not available.", {db: !!db, canvasAppId: window.canvasAppId, userId: userId, borrowerId: borrowerId});
-                return null;
-            }
-            return doc(db, 'artifacts', window.canvasAppId, 'users', userId, 'borrowers', borrowerId);
-        };
-
-        window.setFirestoreDoc = setDoc;
-        window.addFirestoreDoc = addDoc;
-        window.deleteFirestoreDoc = deleteDoc;
-        window.updateFirestoreDoc = updateDoc;
-        window.onFirestoreSnapshot = onSnapshot;
-        window.firestoreQuery = query;
-        window.signInWithGoogle = signInWithGoogle; // Expose Google sign-in
-        window.signOutUser = signOutUser; // Expose sign-out
-        window.canvasAppId = canvasAppId; // Expose canvasAppId for use in React components
-    </script>
-</head>
+    </head>
 <body>
     <div id="root"></div>
 
@@ -1419,6 +1279,7 @@
         const UpdateHistoryModal = ({ onClose }) => {
             // 更新歷史記錄，日期修正為 2025 年，並確保最新日期在上方
             const updateHistory = [
+                { date: '2025-05-29', content: '版本 v2.2.10：修正新增借款人後重複顯示的問題，並確保編輯/刪除操作的 ID 一致性。' },
                 { date: '2025-05-29', content: '版本 v2.2.9：修正新增借款人後重複顯示的問題，並確保編輯/刪除操作的 ID 一致性。' },
                 { date: '2025-05-29', content: '版本 v2.2.5：修正借款人新增後無法編輯/刪除的問題 (ID 不一致，文件路徑錯誤)，並優化 Firestore 引用構建。' },
                 { date: '2025-05-29', content: '版本 v2.2.4：修正借款人新增後無法編輯/刪除的問題 (ID 不一致，文件路徑錯誤)。' },
@@ -1493,7 +1354,7 @@
             // 儲存訊息提示
             const [message, setMessage] = React.useState('');
             // 應用程式版本
-            const appVersion = "v2.2.9"; // 設定為最新的版本號
+            const appVersion = "v2.2.10"; // 設定為最新的版本號
 
             // 控制更新紀錄模態框顯示
             const [showUpdateHistoryModal, setShowUpdateHistoryModal] = React.useState(false);
@@ -1825,28 +1686,7 @@
                     <header className="mb-8 text-center">
                         <h1 className="text-4xl font-extrabold text-red-700 drop-shadow-md">小額借款CRM</h1>
                         <p className="mt-2 text-lg text-gray-600">管理借款人資料與還款情況</p>
-                        {isFirebaseReady && (
-                            <div className="mt-4">
-                                {user ? (
-                                    <div className="flex items-center justify-center space-x-4">
-                                        <span className="text-gray-700">歡迎，{user.displayName || user.email || '匿名使用者'}！</span>
-                                        <button
-                                            onClick={window.signOutUser}
-                                            className="rounded-full bg-red-500 px-4 py-2 text-white shadow-md hover:bg-red-600 transition duration-300"
-                                        >
-                                            登出
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={window.signInWithGoogle}
-                                        className="rounded-full bg-blue-500 px-6 py-3 text-white shadow-lg hover:bg-blue-600 transition duration-300 ease-in-out transform hover:scale-105"
-                                    >
-                                        使用 Google 登入
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                        {/* Removed Firebase authentication UI */}
                     </header>
 
                     {message && (
@@ -1856,7 +1696,7 @@
                     )}
 
                     {/* 主介面：顯示列表或表單 */}
-                    {!selectedBorrowerId && !showForm && user && ( // Only show if user is logged in
+                    {!selectedBorrowerId && !showForm && ( // Always show if not editing/adding
                         <div className="mx-auto max-w-4xl rounded-xl bg-white p-6 shadow-2xl">
                             <div className="mb-6 flex justify-between items-center">
                                 <h2 className="text-2xl font-semibold text-red-600">借款人列表</h2>
@@ -1944,7 +1784,7 @@
                     )}
 
                     {/* 新增/編輯借款人表單 */}
-                    {(showForm || (selectedBorrowerId && selectedBorrower)) && user && ( // Ensure selectedBorrower exists before rendering form
+                    {(showForm || (selectedBorrowerId && selectedBorrower)) && ( // Always show if editing/adding
                         <BorrowerForm
                             borrower={selectedBorrower} // 如果是編輯模式，傳入現有資料
                             onSave={selectedBorrower ? handleUpdateBorrower : handleAddBorrower}
