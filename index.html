@@ -153,8 +153,23 @@
         window.firebaseDb = db;
         window.firebaseAuth = auth;
         window.getCurrentUserId = () => currentUserId;
-        window.getFirestoreCollection = (collectionPath) => collection(db, collectionPath);
-        window.getFirestoreDoc = (docPath) => doc(db, docPath);
+        // Corrected helper functions for Firestore references
+        window.getFirestoreCollectionRef = (userId) => {
+            if (!db || !window.canvasAppId || !userId) {
+                console.error("Firestore DB, appId, or userId not available for collection reference.");
+                return null;
+            }
+            return collection(db, 'artifacts', window.canvasAppId, 'users', userId, 'borrowers');
+        };
+
+        window.getFirestoreDocRef = (userId, borrowerId) => {
+            if (!db || !window.canvasAppId || !userId || !borrowerId) {
+                console.error("Firestore DB, appId, userId, or borrowerId not available for document reference.");
+                return null;
+            }
+            return doc(db, 'artifacts', window.canvasAppId, 'users', userId, 'borrowers', borrowerId);
+        };
+
         window.setFirestoreDoc = setDoc;
         window.addFirestoreDoc = addDoc;
         window.deleteFirestoreDoc = deleteDoc;
@@ -1407,6 +1422,7 @@
         const UpdateHistoryModal = ({ onClose }) => {
             // 更新歷史記錄，日期修正為 2025 年，並確保最新日期在上方
             const updateHistory = [
+                { date: '2025-05-29', content: '版本 v2.2.4：修正借款人新增後無法編輯/刪除的問題 (ID 不一致，文件路徑錯誤)。' },
                 { date: '2025-05-29', content: '版本 v2.2.3：修正借款人新增後無法編輯/刪除的問題 (ID 不一致)。' },
                 { date: '2025-05-29', content: '版本 v2.2.2：修正借款人列表頁面無法查看/編輯/刪除的問題 (文件路徑錯誤)。' },
                 { date: '2025-05-28', content: '版本 v2.2.1：修正 Firebase Collection Reference 錯誤。' },
@@ -1478,7 +1494,7 @@
             // 儲存訊息提示
             const [message, setMessage] = React.useState('');
             // 應用程式版本
-            const appVersion = "v2.2.3"; // 設定為最新的版本號
+            const appVersion = "v2.2.4"; // 設定為最新的版本號
 
             // 控制更新紀錄模態框顯示
             const [showUpdateHistoryModal, setShowUpdateHistoryModal] = React.useState(false);
@@ -1519,8 +1535,8 @@
                     if (window.firebaseDb && user && user.uid) { // Ensure user and user.uid are available
                         const db = window.firebaseDb;
                         // Collection path now includes user.uid for private data
-                        const borrowersCollectionRef = window.getFirestoreCollection(`artifacts/${window.canvasAppId}/users/${user.uid}/borrowers`);
-                        console.log("Fetching from path:", `artifacts/${window.canvasAppId}/users/${user.uid}/borrowers`); // Log the path
+                        const borrowersCollectionRef = window.getFirestoreCollectionRef(user.uid); // Use new helper
+                        console.log("Fetching from collection ref:", borrowersCollectionRef.path); // Log the path
 
                         unsubscribeFirestore = window.onFirestoreSnapshot(borrowersCollectionRef, (snapshot) => {
                             const fetchedBorrowers = snapshot.docs.map(doc => ({
@@ -1562,8 +1578,8 @@
                         return;
                     }
                     // Collection path now includes user.uid
-                    const borrowersCollectionRef = window.getFirestoreCollection(`artifacts/${window.canvasAppId}/users/${user.uid}/borrowers`);
-                    const docRef = await window.addFirestoreDoc(borrowersCollectionRef, {
+                    const borrowersCollectionRef = window.getFirestoreCollectionRef(user.uid); // Use new helper
+                    const docRef = await window.addFirestoreDoc(borrowersCollectionRef, { // Pass collection ref
                         ...newBorrower,
                         // Ensure transactions and events are always arrays
                         transactions: newBorrower.transactions || [{
@@ -1576,7 +1592,7 @@
                         events: newBorrower.events || [],
                         ownerId: user.uid, // Assign owner ID
                     });
-                    console.log("Added borrower to path:", `artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${docRef.id}`); // Log the path
+                    console.log("Added borrower to path:", docRef.path); // Log the path
                     // CORRECTED: Use docRef.id for the new borrower's ID in local state
                     setBorrowers(prevBorrowers => [...prevBorrowers, { ...newBorrower, id: docRef.id, transactions: newBorrower.transactions || [], events: newBorrower.events || [] }]);
                     setMessage('借款人新增成功！');
@@ -1597,9 +1613,9 @@
                         return;
                     }
                     // Document path now includes user.uid
-                    const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${updatedBorrower.id}`);
-                    console.log("Updating borrower at path:", `artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${updatedBorrower.id}`); // Log the path
-                    await window.setFirestoreDoc(borrowerDocRef, updatedBorrower); // Overwrites the document
+                    const borrowerDocRef = window.getFirestoreDocRef(user.uid, updatedBorrower.id); // Use new helper
+                    console.log("Updating borrower at path:", borrowerDocRef.path); // Log the path
+                    await window.setFirestoreDoc(borrowerDocRef, updatedBorrower); // Pass document ref
                     setMessage('借款人資料更新成功！');
                     setSelectedBorrowerId(null);
                     setShowForm(false);
@@ -1620,9 +1636,9 @@
                             return;
                         }
                         // Document path now includes user.uid
-                        const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${id}`);
-                        console.log("Deleting borrower at path:", `artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${id}`); // Log the path
-                        await window.deleteFirestoreDoc(borrowerDocRef);
+                        const borrowerDocRef = window.getFirestoreDocRef(user.uid, id); // Use new helper
+                        console.log("Deleting borrower at path:", borrowerDocRef.path); // Log the path
+                        await window.deleteFirestoreDoc(borrowerDocRef); // Pass document ref
                         setMessage('借款人刪除成功！');
                     } catch (error) {
                         console.error('刪除借款人失敗:', error);
@@ -1645,9 +1661,9 @@
                         return;
                     }
                     // Document path now includes user.uid
-                    const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${borrowerId}`);
-                    console.log("Updating transactions at path:", `artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${borrowerId}`); // Log the path
-                    await window.updateFirestoreDoc(borrowerDocRef, { transactions: updatedTransactionsArray });
+                    const borrowerDocRef = window.getFirestoreDocRef(user.uid, borrowerId); // Use new helper
+                    console.log("Updating transactions at path:", borrowerDocRef.path); // Log the path
+                    await window.updateFirestoreDoc(borrowerDocRef, { transactions: updatedTransactionsArray }); // Pass document ref
                     setMessage('金流記錄更新成功！');
                 } catch (error) {
                     console.error('更新金流記錄失敗:', error);
@@ -1665,9 +1681,9 @@
                         return;
                     }
                     // Document path now includes user.uid
-                    const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${borrowerId}`);
-                    console.log("Updating events at path:", `artifacts/${window.canvasAppId}/users/${user.uid}/borrowers/${borrowerId}`); // Log the path
-                    await window.updateFirestoreDoc(borrowerDocRef, { events: updatedEventsArray });
+                    const borrowerDocRef = window.getFirestoreDocRef(user.uid, borrowerId); // Use new helper
+                    console.log("Updating events at path:", borrowerDocRef.path); // Log the path
+                    await window.updateFirestoreDoc(borrowerDocRef, { events: updatedEventsArray }); // Pass document ref
                     setMessage('事件記錄更新成功！');
                 } catch (error) {
                     console.error('更新事件記錄失敗:', error);
