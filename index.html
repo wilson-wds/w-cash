@@ -1061,7 +1061,7 @@
                 }
                 if (formData.repaymentPeriod === '10天') {
                     const days = formData.tenDayPaymentDays.split(',').map(d => parseInt(d.trim()));
-                    if (days.some(isNaN) || days.some(d => d < 1 || d > 31) || days.length === 0) {
+                    if (days.some(isNaN) || days.some(d => d < 1 || d < 31) || days.length === 0) {
                         setFormMessage('請輸入有效的10天繳款日 (例如: 10,20,30)！');
                         return;
                     }
@@ -1917,13 +1917,19 @@
                                                         <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{borrower.dueDate || 'N/A'}</td>
                                                         <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
                                                             <button
-                                                                onClick={() => setSelectedBorrowerId(borrower.id)}
+                                                                onClick={() => {
+                                                                    console.log("Attempting to view/edit borrower with ID:", borrower.id);
+                                                                    setSelectedBorrowerId(borrower.id);
+                                                                }}
                                                                 className="text-red-600 hover:text-red-900 mr-3 transition duration-150 ease-in-out"
                                                             >
                                                                 查看/編輯
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDeleteBorrower(borrower.id)}
+                                                                onClick={() => {
+                                                                    console.log("Attempting to delete borrower with ID:", borrower.id);
+                                                                    handleDeleteBorrower(borrower.id);
+                                                                }}
                                                                 className="text-red-600 hover:text-red-900 transition duration-150 ease-in-out"
                                                             >
                                                                 刪除
@@ -1940,7 +1946,7 @@
                     )}
 
                     {/* 新增/編輯借款人表單 */}
-                    {(showForm || selectedBorrowerId) && user && ( // Only show if user is logged in
+                    {(showForm || (selectedBorrowerId && selectedBorrower)) && user && ( // Ensure selectedBorrower exists before rendering form
                         <BorrowerForm
                             borrower={selectedBorrower} // 如果是編輯模式，傳入現有資料
                             onSave={selectedBorrower ? handleUpdateBorrower : handleAddBorrower}
