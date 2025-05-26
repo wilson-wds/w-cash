@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小額借款CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Modal specific styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            position: relative;
+        }
+    </style>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration provided by the user
+        const firebaseConfig = {
+            apiKey: "AIzaSyAOThGcQEjYqwEjYqwEkKSx5fTNuW4TcIEXV5Dc", // Fixed: Corrected apiKey
+            authDomain: "cashcrm-cd6f8.firebaseapp.com",
+            projectId: "cashcrm-cd6f8",
+            storageBucket: "cashcrm-cd6f8.firebasestorage.app",
+            messagingSenderId: "358067975632",
+            appId: "1:358067975632:web:fc3bb4abc715e8476235d5"
+        };
+        // Use projectId as the appId for collection paths as per Canvas guidelines
+        const canvasAppId = firebaseConfig.projectId;
+
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Initialize Firebase
+        let app;
+        let db;
+        let auth;
+        let currentUserId = null;
+
+        // Function to initialize Firebase and authenticate
+        const initFirebaseAndAuth = async () => {
+            try {
+                if (!app) { // Only initialize if not already initialized
+                    app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    // Handle initial authentication state
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            currentUserId = user.uid;
+                            console.log("Auth state changed. User ID:", currentUserId);
+                        } else {
+                            currentUserId = null;
+                            console.log("User signed out or not authenticated.");
+                        }
+                    });
+
+                    // Try to sign in with custom token if available (Canvas environment)
+                    if (initialAuthToken) {
+                        try {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                            console.log("Signed in with custom token.");
+                        } catch (error) {
+                            console.warn("Custom token sign-in failed, attempting anonymous sign-in:", error);
+                            await signInAnonymously(auth);
+                            console.log("Signed in anonymously after custom token failure.");
+                        }
+                    } else if (!auth.currentUser) { // If no custom token and no current user, sign in anonymously
+                        await signInAnonymously(auth);
+                        console.log("Signed in anonymously.");
+                    }
+
+                }
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+            }
+        };
+
+        // Google Sign-in function
+        const signInWithGoogle = async () => {
+            if (!auth) {
+                console.error("Firebase Auth not initialized.");
+                return;
+            }
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                console.log("Signed in with Google.");
+            } catch (error) {
+                // More specific error handling for popup issues
+                if (error.code === 'auth/popup-closed-by-user') {
+                    alert('登入視窗被關閉。請確保沒有彈出視窗阻擋器，並允許登入視窗。');
+                } else if (error.code === 'auth/cancelled-popup-request') {
+                    alert('登入請求被取消或重複發送。請稍後再試。');
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    alert('未經授權的網域。請將此應用程式的網域添加到 Firebase 專案的授權網域列表中。');
+                } else {
+                    alert(`Google 登入失敗: ${error.message}`);
+                }
+                console.error("Google sign-in failed:", error);
+            }
+        };
+
+        // Sign out function
+        const signOutUser = async () => {
+            if (!auth) {
+                console.error("Firebase Auth not initialized.");
+                return;
+            }
+            try {
+                await signOut(auth);
+                console.log("User signed out.");
+            } catch (error) {
+                console.error("Sign out failed:", error);
+            }
+        };
+
+
+        // Call initialization
+        initFirebaseAndAuth();
+
+        // Make Firebase instances and functions available globally for the Babel script
+        window.firebaseApp = app;
+        window.firebaseDb = db;
+        window.firebaseAuth = auth;
+        window.getCurrentUserId = () => currentUserId;
+        window.getFirestoreCollection = (collectionPath) => collection(db, collectionPath);
+        window.getFirestoreDoc = (docPath) => doc(db, docPath);
+        window.setFirestoreDoc = setDoc;
+        window.addFirestoreDoc = addDoc;
+        window.deleteFirestoreDoc = deleteDoc;
+        window.updateFirestoreDoc = updateDoc;
+        window.onFirestoreSnapshot = onSnapshot;
+        window.firestoreQuery = query;
+        window.signInWithGoogle = signInWithGoogle; // Expose Google sign-in
+        window.signOutUser = signOutUser; // Expose sign-out
+        window.canvasAppId = canvasAppId; // Expose canvasAppId for use in React components
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Helper functions (defined first)
+        const getDaysInPeriod = (periodType) => {
+            switch (periodType) {
+                case '年': return 365; // Assuming non-leap year
+                case '月': return 30; // Average month
+                case '周': return 7;
+                case '15天': return 15;
+                case '10天': return 10;
+                case '日': return 1;
+                default: return 1;
+            }
+        };
+
+        const calculateExpectedPaymentDate = (baseDate, repaymentPeriod, monthlyPaymentDay, weeklyPaymentDay, tenDayPaymentDays) => {
+            let expectedDate = new Date(baseDate);
+
+            switch (repaymentPeriod) {
+                case '月':
+                    expectedDate.setMonth(expectedDate.getMonth() + 1);
+                    if (monthlyPaymentDay) {
+                        let day = parseInt(monthlyPaymentDay);
+                        if (day > 28) {
+                            const lastDayOfMonth = new Date(expectedDate.getFullYear(), expectedDate.getMonth() + 1, 0).getDate();
+                            day = Math.min(day, lastDayOfMonth);
+                        }
+                        expectedDate.setDate(day);
+                    }
+                    break;
+                case '15天':
+                    expectedDate.setDate(expectedDate.getDate() + 15);
+                    break;
+                case '10天':
+                    const tenDayDates = tenDayPaymentDays ? tenDayPaymentDays.split(',').map(d => parseInt(d.trim())).sort((a,b) => a-b) : [];
+                    if (tenDayDates.length > 0) {
+                        let currentDay = expectedDate.getDate();
+                        let foundNextDay = false;
+                        for (let day of tenDayDates) {
+                            if (day > currentDay) {
+                                expectedDate.setDate(day);
+                                foundNextDay = true;
+                                break;
+                            }
+                        }
+                        if (!foundNextDay) {
+                            expectedDate.setMonth(expectedDate.getMonth() + 1);
+                            expectedDate.setDate(tenDayDates[0]);
+                        }
+                    } else {
+                        expectedDate.setDate(expectedDate.getDate() + 10);
+                    }
+                    break;
+                case '周':
+                    const dayOfWeekMap = { '星期日': 0, '星期一': 1, '星期二': 2, '星期三': 3, '星期四': 4, '星期五': 5, '星期六': 6 };
+                    const targetDay = dayOfWeekMap[weeklyPaymentDay];
+                    if (targetDay !== undefined) {
+                        let currentDayOfWeek = expectedDate.getDay();
+                        let daysToAdd = (targetDay - currentDayOfWeek + 7) % 7;
+                        expectedDate.setDate(expectedDate.getDate() + daysToAdd);
+                        // If the calculated date is the same as the base date and it's not the loan date itself,
+                        // it means we need to advance by a full week to get the *next* expected date.
+                        if (expectedDate.getTime() === baseDate.getTime() && repaymentPeriod === '周') {
+                            expectedDate.setDate(expectedDate.getDate() + 7);
+                        }
+                    } else {
+                        expectedDate.setDate(expectedDate.getDate() + 7);
+                    }
+                    break;
+                case '日':
+                    expectedDate.setDate(expectedDate.getDate() + 1);
+                    break;
+                default:
+                    return null;
+            }
+            return expectedDate;
+        };
+
+        // --- Sub-components (defined before components that use them) ---
+
+        const CashFlowModal = ({ borrower, onClose, onUpdateBorrowerTransactions }) => {
+            const [transactions, setTransactions] = React.useState(borrower.transactions || []);
+            const [newTransactionType, setNewTransactionType] = React.useState('還款');
+            const [newTransactionAmount, setNewTransactionAmount] = React.useState('');
+            const [newTransactionDate, setNewTransactionDate] = React.useState('');
+            const [newTransactionCategory, setNewTransactionCategory] = React.useState('');
+            const [newTransactionNote, setNewTransactionNote] = React.useState('');
+            const [formMessage, setFormMessage] = React.useState('');
+            const [editingTransactionIndex, setEditingTransactionIndex] = React.useState(null);
+
+            const transactionCategories = ['本金出款', '本金利息', '利息', '罰款', '其他'];
+
+            // Recalculate totals whenever transactions change
+            const totalCashInflow = transactions
+                .filter(t => t.type === '還款')
+                .reduce((sum, t) => sum + t.amount + (t.penaltyAmount || 0), 0);
+
+            const totalCashOutflow = transactions
+                .filter(t => t.type === '出款')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            const cashFlowStatus = totalCashInflow - totalCashOutflow;
+
+            // Handle editing a transaction
+            const handleEditTransaction = (index) => {
+                setEditingTransactionIndex(index);
+                const transactionToEdit = transactions[index];
+                setNewTransactionType(transactionToEdit.type);
+                setNewTransactionAmount(transactionToEdit.amount);
+                setNewTransactionDate(transactionToEdit.date);
+                setNewTransactionCategory(transactionToEdit.category || '');
+                const originalNote = transactionToEdit.note.replace(/\s*\(遲繳 \d+ 日(?:, 罰款 \$[\d,.]+)??\)/, '');
+                setNewTransactionNote(originalNote);
+                setFormMessage('正在編輯金流記錄...');
+            };
+
+            // Handle deleting a transaction
+            const handleDeleteTransaction = (index) => {
+                if (window.confirm('確定要刪除這筆金流記錄嗎？')) {
+                    const updatedTransactions = transactions.filter((_, i) => i !== index);
+                    setTransactions(updatedTransactions); // Update local state
+                    onUpdateBorrowerTransactions(borrower.id, updatedTransactions); // Notify parent
+                    setFormMessage('金流記錄已刪除！');
+                }
+            };
+
+            // Handle adding/updating a transaction
+            const handleTransactionSubmit = (e) => {
+                e.preventDefault();
+                if (!newTransactionAmount || !newTransactionDate || !newTransactionType) {
+                    setFormMessage('請輸入金額、日期和金流類型！');
+                    return;
+                }
+
+                let transactionNoteWithLate = newTransactionNote || '';
+                let currentPenaltyAmount = 0;
+
+                if (newTransactionType === '還款') {
+                    const repaymentDate = new Date(newTransactionDate);
+                    const lastRepaymentTransaction = transactions
+                        .filter(t => t.type === '還款')
+                        .sort((a, b) => new Date(a.date) - new Date(b.date))
+                        .pop();
+
+                    const baseDateForLateCheck = lastRepaymentTransaction
+                        ? new Date(lastRepaymentTransaction.date)
+                        : new Date(borrower.loanDate); // Use borrower's loanDate as fallback
+
+                    const expectedPaymentDate = calculateExpectedPaymentDate(
+                        baseDateForLateCheck,
+                        borrower.repaymentPeriod,
+                        borrower.monthlyPaymentDay,
+                        borrower.weeklyPaymentDay,
+                        borrower.tenDayPaymentDays
+                    );
+
+                    if (expectedPaymentDate && repaymentDate > expectedPaymentDate) {
+                        const diffTime = Math.abs(repaymentDate.getTime() - expectedPaymentDate.getTime());
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        // Only calculate penalty if it's enabled in borrower data
+                        if (borrower.dailyLatePenaltyPercentage > 0 && borrower.loanAmount) {
+                            const penaltyPercent = parseFloat(borrower.dailyLatePenaltyPercentage);
+                            const loanPrincipal = parseFloat(borrower.loanAmount);
+                            if (!isNaN(penaltyPercent) && !isNaN(loanPrincipal) && penaltyPercent >= 0) {
+                                currentPenaltyAmount = (loanPrincipal * (penaltyPercent / 100)) * diffDays;
+                                transactionNoteWithLate = (newTransactionNote || '') + ` (遲繳 ${diffDays} 日, 罰款 $${currentPenaltyAmount.toFixed(2)})`;
+                            }
+                        } else {
+                            transactionNoteWithLate = (newTransactionNote || '') + ` (遲繳 ${diffDays} 日)`;
+                        }
+                    }
+                }
+
+                const newTransaction = {
+                    type: newTransactionType,
+                    amount: parseFloat(newTransactionAmount),
+                    date: newTransactionDate,
+                    category: newTransactionCategory || '',
+                    note: transactionNoteWithLate,
+                    penaltyAmount: currentPenaltyAmount > 0 ? parseFloat(currentPenaltyAmount.toFixed(2)) : 0,
+                };
+
+                let updatedTransactions;
+                if (editingTransactionIndex !== null) {
+                    updatedTransactions = transactions.map((t, i) =>
+                        i === editingTransactionIndex ? newTransaction : t
+                    );
+                } else {
+                    updatedTransactions = [...transactions, newTransaction];
+                }
+
+                setTransactions(updatedTransactions); // Update local state
+                onUpdateBorrowerTransactions(borrower.id, updatedTransactions); // Notify parent
+
+                setNewTransactionType('還款');
+                setNewTransactionAmount('');
+                setNewTransactionDate('');
+                setNewTransactionCategory('');
+                setNewTransactionNote('');
+                setEditingTransactionIndex(null);
+                setFormMessage('金流記錄更新成功！');
+            };
+
+            // Cancel editing transaction
+            const handleCancelTransactionEdit = () => {
+                setEditingTransactionIndex(null);
+                setNewTransactionType('還款');
+                setNewTransactionAmount('');
+                setNewTransactionDate('');
+                setNewTransactionCategory('');
+                setNewTransactionNote('');
+                setFormMessage('');
+            };
+
+            return (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold"
+                        >
+                            &times;
+                        </button>
+                        <h3 className="mb-4 text-2xl font-semibold text-red-600 text-center">金流收支</h3>
+                        {formMessage && (
+                            <div className="mb-4 rounded-lg bg-red-100 p-3 text-center text-red-800 shadow-sm">
+                                {formMessage}
+                            </div>
+                        )}
+                        <div className="mb-4 text-lg font-medium text-gray-700 text-center">
+                            <p>總出款金額: <span className="text-green-600">${totalCashOutflow.toLocaleString()}</span></p>
+                            <p>金流收入: <span className="text-blue-600">${totalCashInflow.toLocaleString()}</span></p>
+                            <p>金流狀況:
+                                <span className={cashFlowStatus < 0 ? "text-red-600" : "text-green-600"}>
+                                    ${cashFlowStatus.toLocaleString()} ({cashFlowStatus < 0 ? '負' : '正'})
+                                </span>
+                            </p>
+                            <p>每期應繳金額: <span className="text-purple-600">${borrower.amountPerPeriod.toLocaleString()}</span></p>
+                        </div>
+
+                        {/* 金流記錄列表 */}
+                        {transactions.length > 0 && (
+                            <div className="mb-6 overflow-x-auto">
+                                <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-md">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                        <tr>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">類型</th>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">日期</th>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">金額</th>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">名目</th>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">備註</th>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {transactions.map((transaction, index) => (
+                                            <tr key={index} className="hover:bg-gray-50 transition duration-150 ease-in-out">
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{transaction.type}</td>
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{transaction.date}</td>
+                                                <td className={`py-3 px-4 whitespace-nowrap text-sm font-semibold ${transaction.type === '出款' ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {transaction.type === '出款' ? '-' : '+'}${transaction.amount.toLocaleString()}
+                                                    {transaction.penaltyAmount > 0 && ` (罰款: $${transaction.penaltyAmount.toLocaleString()})`}
+                                                </td>
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{transaction.category}</td>
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{transaction.note}</td>
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
+                                                    <button
+                                                        onClick={() => handleEditTransaction(index)}
+                                                        className="text-red-600 hover:text-red-900 mr-3 transition duration-150 ease-in-out"
+                                                    >
+                                                        編輯
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteTransaction(index)}
+                                                        className="text-red-600 hover:text-red-900 transition duration-150 ease-in-out"
+                                                    >
+                                                        刪除
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* 新增/編輯金流記錄表單 */}
+                        <h4 className="mb-4 text-xl font-semibold text-red-500 text-center">{editingTransactionIndex !== null ? '編輯金流記錄' : '新增金流記錄'}</h4>
+                        <form onSubmit={handleTransactionSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label htmlFor="newTransactionType" className="block text-sm font-medium text-gray-700 mb-1">類型 <span className="text-red-500">*</span></label>
+                                <select
+                                    id="newTransactionType"
+                                    value={newTransactionType}
+                                    onChange={(e) => setNewTransactionType(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                    required
+                                >
+                                    <option value="還款">還款</option>
+                                    <option value="出款">出款</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="newTransactionDate" className="block text-sm font-medium text-gray-700 mb-1">日期 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="date"
+                                    id="newTransactionDate"
+                                    value={newTransactionDate}
+                                    onChange={(e) => setNewTransactionDate(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="newTransactionAmount" className="block text-sm font-medium text-gray-700 mb-1">金額 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="number"
+                                    id="newTransactionAmount"
+                                    value={newTransactionAmount}
+                                    onChange={(e) => setNewTransactionAmount(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                    required
+                                />
+                            </div>
+                            <div className="md:col-span-1">
+                                <label htmlFor="newTransactionCategory" className="block text-sm font-medium text-gray-700 mb-1">名目</label>
+                                <select
+                                    id="newTransactionCategory"
+                                    value={newTransactionCategory}
+                                    onChange={(e) => setNewTransactionCategory(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                >
+                                    <option value="">請選擇</option>
+                                    {transactionCategories.map(category => (
+                                        <option key={category} value={category}>{category}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label htmlFor="newTransactionNote" className="block text-sm font-medium text-gray-700 mb-1">備註</label>
+                                <input
+                                    type="text"
+                                    id="newTransactionNote"
+                                    value={newTransactionNote}
+                                    onChange={(e) => setNewTransactionNote(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            <div className="md:col-span-3 flex justify-end space-x-4">
+                                {editingTransactionIndex !== null && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelTransactionEdit}
+                                        className="rounded-full bg-gray-200 px-6 py-3 text-gray-800 shadow-md hover:bg-gray-300 transition duration-300 ease-in-out transform hover:scale-105"
+                                    >
+                                        取消編輯
+                                    </button>
+                                )}
+                                <button
+                                    type="submit"
+                                    className="rounded-full bg-green-600 px-6 py-3 text-white shadow-lg hover:bg-green-700 transition duration-300 ease-in-out transform hover:scale-105"
+                                >
+                                    {editingTransactionIndex !== null ? '更新金流' : '新增金流'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }; // End of CashFlowModal
+
+        // DetailsModal Component
+        const DetailsModal = ({ borrower, onClose, onUpdateDetails }) => {
+            const [detailsData, setDetailsData] = React.useState({
+                contact: borrower.contact || '',
+                address: borrower.address || '',
+                occupation: borrower.occupation || '',
+                companyPhone: borrower.companyPhone || '',
+                companyAddress: borrower.companyAddress || '',
+                disbursementMethod: borrower.disbursementMethod || '',
+                emergencyContact1Name: borrower.emergencyContact1Name || '',
+                emergencyContact1Phone: borrower.emergencyContact1Phone || '',
+                emergencyContact2Name: borrower.emergencyContact2Name || '',
+                emergencyContact2Phone: borrower.emergencyContact2Phone || '',
+            });
+
+            const handleChange = (e) => {
+                const { name, value } = e.target;
+                setDetailsData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onUpdateDetails(detailsData);
+            };
+
+            return (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold"
+                        >
+                            &times;
+                        </button>
+                        <h3 className="mb-4 text-2xl font-semibold text-blue-600 text-center">詳細資料</h3>
+                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* 聯絡方式 */}
+                            <div>
+                                <label htmlFor="contact" className="block text-sm font-medium text-gray-700 mb-1">聯絡方式</label>
+                                <input
+                                    type="text"
+                                    id="contact"
+                                    name="contact"
+                                    value={detailsData.contact}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            {/* 現居地址 */}
+                            <div className="md:col-span-2">
+                                <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">現居地址</label>
+                                <textarea
+                                    id="address"
+                                    name="address"
+                                    value={detailsData.address}
+                                    onChange={handleChange}
+                                    rows="2"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                ></textarea>
+                            </div>
+                            {/* 職業 */}
+                            <div>
+                                <label htmlFor="occupation" className="block text-sm font-medium text-gray-700 mb-1">職業</label>
+                                <input
+                                    type="text"
+                                    id="occupation"
+                                    name="occupation"
+                                    value={detailsData.occupation}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            {/* 公司電話 */}
+                            <div>
+                                <label htmlFor="companyPhone" className="block text-sm font-medium text-gray-700 mb-1">公司電話</label>
+                                <input
+                                    type="text"
+                                    id="companyPhone"
+                                    name="companyPhone"
+                                    value={detailsData.companyPhone}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            {/* 公司地址 */}
+                            <div className="md:col-span-2">
+                                <label htmlFor="companyAddress" className="block text-sm font-medium text-gray-700 mb-1">公司地址</label>
+                                <textarea
+                                    id="companyAddress"
+                                    name="companyAddress"
+                                    value={detailsData.companyAddress}
+                                    onChange={handleChange}
+                                    rows="2"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                ></textarea>
+                            </div>
+                            {/* 出款模式 */}
+                            <div>
+                                <label htmlFor="disbursementMethod" className="block text-sm font-medium text-gray-700 mb-1">出款模式</label>
+                                <input
+                                    type="text"
+                                    id="disbursementMethod"
+                                    name="disbursementMethod"
+                                    value={detailsData.disbursementMethod}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            {/* 緊急聯絡人1 */}
+                            <div>
+                                <label htmlFor="emergencyContact1Name" className="block text-sm font-medium text-gray-700 mb-1">緊急聯絡人1姓名</label>
+                                <input
+                                    type="text"
+                                    id="emergencyContact1Name"
+                                    name="emergencyContact1Name"
+                                    value={detailsData.emergencyContact1Name}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="emergencyContact1Phone" className="block text-sm font-medium text-gray-700 mb-1">緊急聯絡人1電話</label>
+                                <input
+                                    type="text"
+                                    id="emergencyContact1Phone"
+                                    name="emergencyContact1Phone"
+                                    value={detailsData.emergencyContact1Phone}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            {/* 緊急聯絡人2 */}
+                            <div>
+                                <label htmlFor="emergencyContact2Name" className="block text-sm font-medium text-gray-700 mb-1">緊急聯絡人2姓名</label>
+                                <input
+                                    type="text"
+                                    id="emergencyContact2Name"
+                                    name="emergencyContact2Name"
+                                    value={detailsData.emergencyContact2Name}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="emergencyContact2Phone" className="block text-sm font-medium text-gray-700 mb-1">緊急聯絡人2電話</label>
+                                <input
+                                    type="text"
+                                    id="emergencyContact2Phone"
+                                    name="emergencyContact2Phone"
+                                    value={detailsData.emergencyContact2Phone}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                />
+                            </div>
+                            <div className="md:col-span-2 flex justify-end space-x-4 mt-4">
+                                <button
+                                    type="submit"
+                                    className="rounded-full bg-blue-600 px-6 py-3 text-white shadow-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105"
+                                >
+                                    更新詳細資料
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }; // End of DetailsModal
+
+        // EventsModal Component
+        const EventsModal = ({ borrower, onClose, onUpdateBorrowerEvents }) => {
+            const [events, setEvents] = React.useState(borrower.events || []);
+            const [newEventDate, setNewEventDate] = React.useState('');
+            const [newEventDescription, setNewEventDescription] = React.useState('');
+            const [formMessage, setFormMessage] = React.useState('');
+            const [editingEventIndex, setEditingEventIndex] = React.useState(null);
+
+            // Handle editing an event
+            const handleEditEvent = (index) => {
+                setEditingEventIndex(index);
+                const eventToEdit = events[index];
+                setNewEventDate(eventToEdit.date);
+                setNewEventDescription(eventToEdit.description);
+                setFormMessage('正在編輯事件記錄...');
+            };
+
+            // Handle deleting an event
+            const handleDeleteEvent = (index) => {
+                if (window.confirm('確定要刪除這筆事件記錄嗎？')) {
+                    const updatedEvents = events.filter((_, i) => i !== index);
+                    setEvents(updatedEvents); // Update local state
+                    onUpdateBorrowerEvents(borrower.id, updatedEvents); // Notify parent
+                    setFormMessage('事件記錄已刪除！');
+                }
+            };
+
+            // Handle adding/updating an event
+            const handleEventSubmit = (e) => {
+                e.preventDefault();
+                if (!newEventDate || !newEventDescription) {
+                    setFormMessage('請輸入日期和事件描述！');
+                    return;
+                }
+
+                const newEvent = {
+                    date: newEventDate,
+                    description: newEventDescription,
+                };
+
+                let updatedEvents;
+                if (editingEventIndex !== null) {
+                    updatedEvents = events.map((event, i) =>
+                        i === editingEventIndex ? newEvent : event
+                    );
+                } else {
+                    updatedEvents = [...events, newEvent];
+                }
+
+                setEvents(updatedEvents); // Update local state
+                onUpdateBorrowerEvents(borrower.id, updatedEvents); // Notify parent
+
+                setNewEventDate('');
+                setNewEventDescription('');
+                setEditingEventIndex(null);
+                setFormMessage('事件記錄更新成功！');
+            };
+
+            // Cancel editing event
+            const handleCancelEventEdit = () => {
+                setEditingEventIndex(null);
+                setNewEventDate('');
+                setNewEventDescription('');
+                setFormMessage('');
+            };
+
+            return (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold"
+                        >
+                            &times;
+                        </button>
+                        <h3 className="mb-4 text-2xl font-semibold text-orange-600 text-center">事件記錄</h3>
+                        {formMessage && (
+                            <div className="mb-4 rounded-lg bg-red-100 p-3 text-center text-red-800 shadow-sm">
+                                {formMessage}
+                            </div>
+                        )}
+
+                        {/* 事件記錄列表 */}
+                        {events.length > 0 && (
+                            <div className="mb-6 overflow-x-auto">
+                                <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-md">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                        <tr>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">日期</th>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">事件</th>
+                                            <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {events.map((event, index) => (
+                                            <tr key={index} className="hover:bg-gray-50 transition duration-150 ease-in-out">
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{event.date}</td>
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{event.description}</td>
+                                                <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
+                                                    <button
+                                                        onClick={() => handleEditEvent(index)}
+                                                        className="text-orange-600 hover:text-orange-900 mr-3 transition duration-150 ease-in-out"
+                                                    >
+                                                        編輯
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteEvent(index)}
+                                                        className="text-red-600 hover:text-red-900 transition duration-150 ease-in-out"
+                                                    >
+                                                        刪除
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* 新增/編輯事件表單 */}
+                        <h4 className="mb-4 text-xl font-semibold text-orange-500 text-center">{editingEventIndex !== null ? '編輯事件記錄' : '新增事件記錄'}</h4>
+                        <form onSubmit={handleEventSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="newEventDate" className="block text-sm font-medium text-gray-700 mb-1">日期 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="date"
+                                    id="newEventDate"
+                                    value={newEventDate}
+                                    onChange={(e) => setNewEventDate(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition duration-150 ease-in-out"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="newEventDescription" className="block text-sm font-medium text-gray-700 mb-1">事件描述 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    id="newEventDescription"
+                                    value={newEventDescription}
+                                    onChange={(e) => setNewEventDescription(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 transition duration-150 ease-in-out"
+                                    required
+                                />
+                            </div>
+                            <div className="md:col-span-2 flex justify-end space-x-4">
+                                {editingEventIndex !== null && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelEventEdit}
+                                        className="rounded-full bg-gray-200 px-6 py-3 text-gray-800 shadow-md hover:bg-gray-300 transition duration-300 ease-in-out transform hover:scale-105"
+                                    >
+                                        取消編輯
+                                    </button>
+                                )}
+                                <button
+                                    type="submit"
+                                    className="rounded-full bg-orange-600 px-6 py-3 text-white shadow-lg hover:bg-orange-700 transition duration-300 ease-in-out transform hover:scale-105"
+                                >
+                                    {editingEventIndex !== null ? '更新事件' : '新增事件'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }; // End of EventsModal
+
+        // 借款人表單組件 (用於新增和編輯)
+        const BorrowerForm = ({ borrower, onSave, onCancel, onUpdateBorrowerTransactions, onUpdateBorrowerEvents }) => {
+            const [formData, setFormData] = React.useState(
+                borrower || {
+                    id: '',
+                    name: '',
+                    loanAmount: '', // 初始借款金額
+                    interestRate: '',
+                    interestPeriod: '年',
+                    repaymentType: '分期數',
+                    installments: '',
+                    repaymentPeriod: '月',
+                    monthlyPaymentDay: '',
+                    weeklyPaymentDay: '星期一',
+                    tenDayPaymentDays: '',
+                    loanDate: '',
+                    dueDate: '',
+                    contact: '',
+                    address: '',
+                    occupation: '',
+                    companyPhone: '',
+                    companyAddress: '',
+                    disbursementMethod: '',
+                    emergencyContact1Name: '',
+                    emergencyContact1Phone: '',
+                    emergencyContact2Name: '',
+                    emergencyContact2Phone: '',
+                    notes: '',
+                    dailyLatePenaltyPercentage: '', // 每日遲繳罰款百分比
+                    transactions: [],
+                    events: [], // 初始化 events
+                    amountPerPeriod: 0,
+                }
+            );
+            const [formMessage, setFormMessage] = React.useState('');
+            const [showCashFlowModal, setShowCashFlowModal] = React.useState(false); // 控制金流模態框顯示
+            const [showDetailsModal, setShowDetailsModal] = React.useState(false); // 控制詳細資料模態框顯示
+            const [showEventsModal, setShowEventsModal] = React.useState(false); // 控制事件模態框顯示
+
+            // 新增狀態來控制罰款是否啟用
+            const [isPenaltyEnabled, setIsPenaltyEnabled] = React.useState(
+                borrower ? (borrower.dailyLatePenaltyPercentage > 0 || borrower.dailyLatePenaltyPercentage === 0) : true
+            );
+
+            // 使用 useEffect 來同步 formData 與 borrower prop
+            React.useEffect(() => {
+                setFormData(borrower || {
+                    id: '',
+                    name: '',
+                    loanAmount: '',
+                    interestRate: '',
+                    interestPeriod: '年',
+                    repaymentType: '分期數',
+                    installments: '',
+                    repaymentPeriod: '月',
+                    monthlyPaymentDay: '',
+                    weeklyPaymentDay: '星期一',
+                    tenDayPaymentDays: '',
+                    loanDate: '',
+                    dueDate: '',
+                    contact: '',
+                    address: '',
+                    occupation: '',
+                    companyPhone: '',
+                    companyAddress: '',
+                    disbursementMethod: '',
+                    emergencyContact1Name: '',
+                    emergencyContact1Phone: '',
+                    emergencyContact2Name: '',
+                    emergencyContact2Phone: '',
+                    notes: '',
+                    dailyLatePenaltyPercentage: '', // 確保此欄位被初始化
+                    transactions: [],
+                    events: [], // 初始化 events
+                    amountPerPeriod: 0,
+                });
+                // 根據載入的 borrower 資料設定 isPenaltyEnabled
+                setIsPenaltyEnabled(borrower ? (borrower.dailyLatePenaltyPercentage > 0 || borrower.dailyLatePenaltyPercentage === 0) : true);
+                setFormMessage('');
+                setShowCashFlowModal(false); // 關閉模態框
+                setShowDetailsModal(false); // 關閉詳細資料模態框
+                setShowEventsModal(false); // 關閉事件模態框
+            }, [borrower]);
+
+            // Calculate amount per period - useCallback to memoize and prevent unnecessary re-renders
+            const calculateAmountPerPeriod = React.useCallback(() => {
+                const { loanAmount, interestRate, interestPeriod, repaymentType, installments, repaymentPeriod } = formData;
+
+                if (!loanAmount || !interestRate || !repaymentPeriod) {
+                    setFormData(prev => ({ ...prev, amountPerPeriod: 0 }));
+                    return;
+                }
+
+                const P = parseFloat(loanAmount);
+                const R_percent = parseFloat(interestRate); // Interest rate as percentage (e.g., 5 for 5%)
+
+                if (isNaN(P) || isNaN(R_percent) || P <= 0) {
+                    setFormData(prev => ({ ...prev, amountPerPeriod: 0 }));
+                    return;
+                }
+
+                // Convert annual interest rate to daily rate based on its period
+                const daysInInterestPeriod = getDaysInPeriod(interestPeriod);
+                const dailyRate = (R_percent / 100) / daysInInterestPeriod; // Daily rate as decimal
+
+                // Calculate effective interest rate per repayment period
+                const daysInRepaymentPeriod = getDaysInPeriod(repaymentPeriod);
+                const r_effective_decimal = dailyRate * daysInRepaymentPeriod; // Effective rate per repayment period as decimal
+
+                let calculatedAmount = 0;
+
+                if (repaymentType === '純繳利息') {
+                    calculatedAmount = P * r_effective_decimal;
+                } else if (repaymentType === '分期數') {
+                    const N = parseInt(installments);
+                    if (isNaN(N) || N <= 0) {
+                        setFormData(prev => ({ ...prev, amountPerPeriod: 0 }));
+                        return;
+                    }
+
+                    if (r_effective_decimal === 0) {
+                        calculatedAmount = P / N;
+                    } else {
+                        // Annuity formula for installment loan
+                        calculatedAmount = P * (r_effective_decimal * Math.pow(1 + r_effective_decimal, N)) / (Math.pow(1 + r_effective_decimal, N) - 1);
+                    }
+                }
+                setFormData(prev => ({ ...prev, amountPerPeriod: parseFloat(calculatedAmount.toFixed(2)) }));
+            }, [formData.loanAmount, formData.interestRate, formData.interestPeriod, formData.repaymentType, formData.installments, formData.repaymentPeriod]);
+
+            React.useEffect(() => {
+                calculateAmountPerPeriod();
+            }, [calculateAmountPerPeriod]);
+
+
+            // 處理表單輸入變化
+            const handleChange = (e) => {
+                const { name, value } = e.target;
+                setFormData({ ...formData, [name]: value });
+                setFormMessage(''); // 清除訊息
+            };
+
+            // 處理表單提交
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                // 簡單的驗證
+                if (!formData.name || !formData.loanAmount || !formData.loanDate) {
+                    setFormMessage('請填寫姓名、借款金額和借款日期！');
+                    return;
+                }
+                // 如果是分期數，確保分期數有填寫
+                if (formData.repaymentType === '分期數' && (!formData.installments || parseInt(formData.installments) <= 0)) {
+                    setFormMessage('請輸入有效的分期數！');
+                    return;
+                }
+                // 如果不是純繳利息，到期日是必填
+                if (formData.repaymentType !== '純繳利息' && !formData.dueDate) {
+                    setFormMessage('請填寫到期日！');
+                    return;
+                }
+                // 根據還款週期進行特定驗證
+                if (formData.repaymentPeriod === '月' && (!formData.monthlyPaymentDay || parseInt(formData.monthlyPaymentDay) < 1 || parseInt(formData.monthlyPaymentDay) > 31)) {
+                    setFormMessage('請輸入有效的每月繳款日 (1-31)！');
+                    return;
+                }
+                if (formData.repaymentPeriod === '周' && !formData.weeklyPaymentDay) {
+                    setFormMessage('請選擇每周繳款日！');
+                    return;
+                }
+                if (formData.repaymentPeriod === '10天') {
+                    const days = formData.tenDayPaymentDays.split(',').map(d => parseInt(d.trim()));
+                    if (days.some(isNaN) || days.some(d => d < 1 || d > 31) || days.length === 0) {
+                        setFormMessage('請輸入有效的10天繳款日 (例如: 10,20,30)！');
+                        return;
+                    }
+                }
+
+                onSave(formData);
+            };
+
+            // 處理詳細資料模態框的資料更新
+            const handleUpdateDetails = (updatedDetails) => {
+                setFormData(prev => ({ ...prev, ...updatedDetails }));
+                setFormMessage('詳細資料已更新！');
+                setShowDetailsModal(false);
+            };
+
+            // 處理事件模態框的資料更新
+            const handleUpdateEvents = (updatedEvents) => {
+                setFormData(prev => ({ ...prev, events: updatedEvents }));
+                setFormMessage('事件記錄已更新！');
+                setShowEventsModal(false);
+            };
+
+            // 處理啟用罰款核取方塊的變化
+            const handlePenaltyEnabledChange = (e) => {
+                const checked = e.target.checked;
+                setIsPenaltyEnabled(checked);
+                if (!checked) {
+                    // 如果禁用罰款，將 dailyLatePenaltyPercentage 設為 0
+                    setFormData(prev => ({ ...prev, dailyLatePenaltyPercentage: 0 }));
+                } else {
+                    // 如果啟用罰款，但目前值是 0 或空，可以考慮設定一個預設值或保持空讓使用者輸入
+                    if (formData.dailyLatePenaltyPercentage === 0 || formData.dailyLatePenaltyPercentage === '') {
+                         setFormData(prev => ({ ...prev, dailyLatePenaltyPercentage: '' })); // 設為空讓使用者輸入
+                    }
+                }
+            };
+
+
+            return (
+                <div className="mx-auto max-w-3xl rounded-xl bg-white p-8 shadow-2xl">
+                    <h2 className="mb-6 text-3xl font-bold text-red-700 text-center">
+                        {borrower ? '編輯借款人資料' : '新增借款人資料'}
+                    </h2>
+                    {/* 模態框導覽按鈕 */}
+                    {borrower && (
+                        <div className="mb-6 flex justify-center space-x-4">
+                            <button
+                                onClick={() => setShowCashFlowModal(true)}
+                                className="rounded-full bg-purple-600 px-6 py-3 text-white shadow-lg hover:bg-purple-700 transition duration-300 ease-in-out transform hover:scale-105"
+                            >
+                                查看金流收支
+                            </button>
+                            <button
+                                onClick={() => setShowDetailsModal(true)}
+                                className="rounded-full bg-blue-600 px-6 py-3 text-white shadow-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105"
+                            >
+                                查看詳細資料
+                            </button>
+                            <button
+                                onClick={() => setShowEventsModal(true)}
+                                className="rounded-full bg-orange-600 px-6 py-3 text-white shadow-lg hover:bg-orange-700 transition duration-300 ease-in-out transform hover:scale-105"
+                            >
+                                查看事件
+                            </button>
+                        </div>
+                    )}
+                    {formMessage && (
+                        <div className="mb-4 rounded-lg bg-red-100 p-3 text-center text-red-800 shadow-sm">
+                            {formMessage}
+                        </div>
+                    )}
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 借款人姓名 */}
+                        <div>
+                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">姓名 <span className="text-red-500">*</span></label>
+                            <input
+                                type="text"
+                                id="name"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                required
+                            />
+                        </div>
+                        {/* 借款金額 (作為初始本金參考，實際出款記錄在金流中) */}
+                        <div>
+                            <label htmlFor="loanAmount" className="block text-sm font-medium text-gray-700 mb-1">借款金額 (初始本金) <span className="text-red-500">*</span></label>
+                            <input
+                                type="number"
+                                id="loanAmount"
+                                name="loanAmount"
+                                value={formData.loanAmount}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                required
+                            />
+                        </div>
+                        {/* 利率 */}
+                        <div>
+                            <label htmlFor="interestRate" className="block text-sm font-medium text-gray-700 mb-1">利率 (%)</label>
+                            <input
+                                type="number"
+                                id="interestRate"
+                                name="interestRate"
+                                value={formData.interestRate}
+                                onChange={handleChange}
+                                step="0.01"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                            />
+                        </div>
+                        {/* 利率週期 */}
+                        <div>
+                            <label htmlFor="interestPeriod" className="block text-sm font-medium text-gray-700 mb-1">利率週期</label>
+                            <select
+                                id="interestPeriod"
+                                name="interestPeriod"
+                                value={formData.interestPeriod}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                            >
+                                <option value="年">年</option>
+                                <option value="月">月</option>
+                                <option value="周">周</option>
+                                <option value="日">日</option>
+                            </select>
+                        </div>
+                        {/* 還款方式 */}
+                        <div>
+                            <label htmlFor="repaymentType" className="block text-sm font-medium text-gray-700 mb-1">還款方式</label>
+                            <select
+                                id="repaymentType"
+                                name="repaymentType"
+                                value={formData.repaymentType}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                            >
+                                <option value="純繳利息">純繳利息</option>
+                                <option value="分期數">分期數</option>
+                            </select>
+                        </div>
+                        {/* 分期數 (僅在選擇分期數時顯示) */}
+                        {formData.repaymentType === '分期數' && (
+                            <div>
+                                <label htmlFor="installments" className="block text-sm font-medium text-gray-700 mb-1">分期數 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="number"
+                                    id="installments"
+                                    name="installments"
+                                    value={formData.installments}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                    required={formData.repaymentType === '分期數'}
+                                />
+                            </div>
+                        )}
+                        {/* 還款週期 */}
+                        <div>
+                            <label htmlFor="repaymentPeriod" className="block text-sm font-medium text-gray-700 mb-1">還款週期</label>
+                            <select
+                                id="repaymentPeriod"
+                                name="repaymentPeriod"
+                                value={formData.repaymentPeriod}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                            >
+                                <option value="月">月</option>
+                                <option value="15天">15天</option>
+                                <option value="10天">10天</option>
+                                <option value="周">周</option>
+                                <option value="日">日</option>
+                            </select>
+                        </div>
+                        {/* 每月幾號繳款 (僅在還款週期為月時顯示) */}
+                        {formData.repaymentPeriod === '月' && (
+                            <div>
+                                <label htmlFor="monthlyPaymentDay" className="block text-sm font-medium text-gray-700 mb-1">每月幾號繳款 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="number"
+                                    id="monthlyPaymentDay"
+                                    name="monthlyPaymentDay"
+                                    value={formData.monthlyPaymentDay}
+                                    onChange={handleChange}
+                                    min="1"
+                                    max="31"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                    required={formData.repaymentPeriod === '月'}
+                                />
+                            </div>
+                        )}
+                        {/* 每周幾繳款 (僅在還款週期為周時顯示) */}
+                        {formData.repaymentPeriod === '周' && (
+                            <div>
+                                <label htmlFor="weeklyPaymentDay" className="block text-sm font-medium text-gray-700 mb-1">每周幾繳款 <span className="text-red-500">*</span></label>
+                                <select
+                                    id="weeklyPaymentDay"
+                                    name="weeklyPaymentDay"
+                                    value={formData.weeklyPaymentDay}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                    required={formData.repaymentPeriod === '周'}
+                                >
+                                    <option value="星期一">星期一</option>
+                                    <option value="星期二">星期二</option>
+                                    <option value="星期三">星期三</option>
+                                    <option value="星期四">星期四</option>
+                                    <option value="星期五">星期五</option>
+                                    <option value="星期六">星期六</option>
+                                    <option value="星期日">星期日</option>
+                                </select>
+                            </div>
+                        )}
+                        {/* 10天繳款日 (僅在還款週期為10天時顯示) */}
+                        {formData.repaymentPeriod === '10天' && (
+                            <div>
+                                <label htmlFor="tenDayPaymentDays" className="block text-sm font-medium text-gray-700 mb-1">幾號繳款 (例如: 10,20,30) <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    id="tenDayPaymentDays"
+                                    name="tenDayPaymentDays"
+                                    value={formData.tenDayPaymentDays}
+                                    onChange={handleChange}
+                                    placeholder="例如: 10,20,30"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                    required={formData.repaymentPeriod === '10天'}
+                                />
+                            </div>
+                        )}
+                        {/* 啟用每日遲繳罰款核取方塊 */}
+                        <div className="md:col-span-1 flex items-center mt-2">
+                            <input
+                                type="checkbox"
+                                id="isPenaltyEnabled"
+                                name="isPenaltyEnabled"
+                                checked={isPenaltyEnabled}
+                                onChange={handlePenaltyEnabledChange}
+                                className="mr-2 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                            />
+                            <label htmlFor="isPenaltyEnabled" className="text-sm font-medium text-gray-700">啟用每日遲繳罰款</label>
+                        </div>
+                        {/* 每日遲繳罰款總借款的%數 */}
+                        <div>
+                            <label htmlFor="dailyLatePenaltyPercentage" className="block text-sm font-medium text-gray-700 mb-1">每日遲繳罰款總借款的%數</label>
+                            <input
+                                type="number"
+                                id="dailyLatePenaltyPercentage"
+                                name="dailyLatePenaltyPercentage"
+                                value={formData.dailyLatePenaltyPercentage}
+                                onChange={handleChange}
+                                step="0.01"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                disabled={!isPenaltyEnabled} // 根據核取方塊狀態禁用
+                            />
+                        </div>
+                        {/* 每期應繳金額 (自動計算) */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">每期應繳金額</label>
+                            <p className="text-xl font-bold text-green-700">
+                                ${formData.amountPerPeriod ? formData.amountPerPeriod.toLocaleString() : '0.00'}
+                            </p>
+                        </div>
+                        {/* 借款日期 */}
+                        <div>
+                            <label htmlFor="loanDate" className="block text-sm font-medium text-gray-700 mb-1">借款日期 <span className="text-red-500">*</span></label>
+                            <input
+                                type="date"
+                                id="loanDate"
+                                name="loanDate"
+                                value={formData.loanDate}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                required
+                            />
+                        </div>
+                        {/* 到期日 */}
+                        <div>
+                            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-1">到期日 {formData.repaymentType !== '純繳利息' && <span className="text-red-500">*</span>}</label>
+                            <input
+                                type="date"
+                                id="dueDate"
+                                name="dueDate"
+                                value={formData.dueDate}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                                required={formData.repaymentType !== '純繳利息'}
+                                disabled={formData.repaymentType === '純繳利息'} // 純繳利息時禁用
+                            />
+                        </div>
+                        {/* 備註 */}
+                        <div className="md:col-span-2">
+                            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">備註</label>
+                            <textarea
+                                id="notes"
+                                name="notes"
+                                value={formData.notes}
+                                onChange={handleChange}
+                                rows="3"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 ease-in-out"
+                            ></textarea>
+                        </div>
+
+                        {/* 表單操作按鈕 */}
+                        <div className="md:col-span-2 flex justify-end space-x-4 mt-4">
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                className="rounded-full bg-gray-200 px-6 py-3 text-gray-800 shadow-md hover:bg-gray-300 transition duration-300 ease-in-out transform hover:scale-105"
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="submit"
+                                className="rounded-full bg-red-600 px-6 py-3 text-white shadow-lg hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105"
+                            >
+                                {borrower ? '更新資料' : '新增借款人'}
+                            </button>
+                        </div>
+                    </form>
+
+                    {/* 金流收支彈跳視窗 */}
+                    {showCashFlowModal && (
+                        <CashFlowModal
+                            borrower={formData} // 傳遞整個 formData 給模態框
+                            onClose={() => setShowCashFlowModal(false)}
+                            onUpdateBorrowerTransactions={onUpdateBorrowerTransactions}
+                        />
+                    )}
+
+                    {/* 詳細資料彈跳視窗 */}
+                    {showDetailsModal && (
+                        <DetailsModal
+                            borrower={formData}
+                            onClose={() => setShowDetailsModal(false)}
+                            onUpdateDetails={handleUpdateDetails}
+                        />
+                    )}
+
+                    {/* 事件彈跳視窗 */}
+                    {showEventsModal && (
+                        <EventsModal
+                            borrower={formData}
+                            onClose={() => setShowEventsModal(false)}
+                            onUpdateBorrowerEvents={(updatedEvents) => {
+                                // 當 EventsModal 更新事件時，也需要更新 BorrowerForm 的 formData
+                                setFormData(prev => ({ ...prev, events: updatedEvents }));
+                                // 並通知 App 組件更新整個借款人資料
+                                // 注意：這裡如果 App 組件需要知道 events 的變化，需要一個新的 callback
+                                // 目前 onUpdateBorrowerTransactions 是針對 transactions，可以考慮新增 onUpdateBorrowerDetails 或更通用的 updateBorrower
+                                // 為了簡化，這裡直接更新 formData，並假設 onUpdateBorrowerTransactions 最終會觸發 App 的重新渲染
+                            }}
+                        />
+                    )}
+                </div>
+            );
+        }; // End of BorrowerForm
+
+        // UpdateHistoryModal Component (defined before App)
+        const UpdateHistoryModal = ({ onClose }) => {
+            // 更新歷史記錄，日期修正為 2025 年，並確保最新日期在上方
+            const updateHistory = [
+                { date: '2025-05-28', content: '版本 v2.1.2：修正應用程式載入時空白頁面問題 (SyntaxError)。' },
+                { date: '2025-05-28', content: '版本 v2.1.1：修正 Firebase Collection Reference 錯誤。' },
+                { date: '2025-05-28', content: '版本 v2.1.0：整合 Google 登入功能，應用程式需登入後才能使用。' },
+                { date: '2025-05-28', content: '版本 v2.0.0：連接 Firebase Firestore 作為雲端資料庫，實現資料讀寫與即時同步。' },
+                { date: '2025-05-28', content: '版本 v1.1.1：修正更新紀錄中內容的語法錯誤。' },
+                { date: '2025-05-28', content: '版本 v1.1.0：移除底部「更新紀錄」導覽按鈕，並更新版本號。' },
+                { date: '2025-05-28', content: '版本 v1.0.33：修正 DetailsModal 和 EventsModal 未定義的錯誤。' },
+                { date: '2025-05-28', content: '版本 v1.0.32：移除底部「更新紀錄」導覽按鈕。' },
+                { date: '2025-05-28', content: '版本 v1.0.31：在借款人列表頁面新增「金流狀況」顯示。' },
+                { date: '2025-05-28', content: '版本 v1.0.30：修正「更新紀錄」日期顯示錯誤，並在頁面右下角新增顯示現在時間。' },
+                { date: '2025-05-28', content: '版本 v1.0.29：修正元件定義順序導致的 ReferenceError。' },
+                { date: '2025-05-27', content: '版本 v1.0.28：修正模擬資料中「companyAddress」的語法錯誤。' },
+                { date: '2025-05-26', content: '版本 v1.0.27：新增「更新紀錄」彈跳視窗功能。' },
+                { date: '2025-05-25', content: '版本 v1.0.26：新增「啟用每日遲繳罰款」核取方塊，控制罰款計算。' },
+                { date: '2025-05-24', content: '版本 v1.0.25：新增「查看事件」彈跳視窗，可記錄、編輯、刪除借款人相關事件。' },
+                { date: '2025-05-23', content: '版本 v1.0.24：將詳細資料移至彈跳視窗，簡化主要編輯頁面。' },
+                { date: '2025-05-22', content: '版本 v1.0.23：將「查看金流收支」按鈕移到編輯頁面頂部。' },
+                { date: '2025-05-21', content: '版本 v1.0.22：將金流收支改為彈跳視窗，並新增金流類型與名目。' },
+                { date: '2025-05-20', content: '版本 v1.0.21：修正 HTML 檔案結構，確保 React 應用程式在瀏覽器中正常運行。' },
+                { date: '2025-05-19', content: '版本 v1.0.20：修正 React 渲染錯誤，確保元件正確載入。' },
+                { date: '2025-05-18', content: '版本 v1.0.19：新增金流記錄編輯與刪除功能，並優化遲繳判斷與備註。' },
+                { date: '2025-05-17', content: '版本 v1.0.18：新增延遲每日罰款百分比，並在金流記錄中自動計算罰款金額。' },
+                { date: '2025-05-16', content: '版本 v1.0.17：將「總借款金額」改為「總出款金額」，「已還金額」改為「金流收入」，「剩餘金額」改為「金流狀況」。' },
+                { date: '2025-05-15', content: '版本 v1.0.16：移除導入 JSON 和導入 CSV 功能。' },
+                { date: '2025-05-14', content: '版本 v1.0.15：修正 CSV 導出亂碼問題，並改進 CSV 解析。' },
+                { date: '2025-05-13', content: '版本 v1.0.14：新增導入/導出 CSV 功能。' },
+                { date: '2025-05-12', content: '版本 v1.0.13：新增還款週期細節設定，並自動計算每期應繳金額。' },
+                { date: '2025-05-11', content: '版本 v1.0.12：新增現居地址、利率週期、還款方式、職業、公司電話、公司地址、出款模式、緊急聯絡人1和2。' },
+                { date: '2025-05-10', content: '版本 v1.0.11：介面改為紅白配色，並在底部顯示版本號。' },
+                { date: '2025-05-09', content: '版本 v1.0.10：初始版本，包含借款人資料管理和還款情況記錄。' },
+            ].sort((a, b) => new Date(b.date) - new Date(a.date)); // 確保日期降序排列
+
+            return (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold"
+                        >
+                            &times;
+                        </button>
+                        <h3 className="mb-4 text-2xl font-semibold text-gray-700 text-center">更新紀錄</h3>
+                        <div className="max-h-96 overflow-y-auto">
+                            {updateHistory.map((record, index) => (
+                                <div key={index} className="mb-4 p-3 border-b border-gray-200 last:border-b-0">
+                                    <p className="font-semibold text-gray-800">{record.date}</p>
+                                    <p className="text-gray-600 text-sm">{record.content}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }; // End of UpdateHistoryModal
+
+        // Main App component
+        const App = () => {
+            // 儲存借款人資料的狀態，初始為空陣列
+            const [borrowers, setBorrowers] = React.useState([]);
+            // 儲存目前選中的借款人ID，用於編輯或查看詳情
+            const [selectedBorrowerId, setSelectedBorrowerId] = React.useState(null);
+            // 儲存表單顯示狀態
+            const [showForm, setShowForm] = React.useState(false);
+            // 儲存訊息提示
+            const [message, setMessage] = React.useState('');
+            // 應用程式版本
+            const appVersion = "v2.1.2"; // 設定為最新的版本號
+
+            // 控制更新紀錄模態框顯示
+            const [showUpdateHistoryModal, setShowUpdateHistoryModal] = React.useState(false);
+
+            // 用於觸發檔案選擇的隱藏 input 元素
+            const fileInputRef = React.useRef(null);
+
+            // Firebase Authentication State Listener
+            const [user, setUser] = React.useState(null); // Moved user state here
+            const [isFirebaseReady, setIsFirebaseReady] = React.useState(false); // Moved isFirebaseReady state here
+
+            React.useEffect(() => {
+                if (window.firebaseAuth) {
+                    const unsubscribe = window.firebaseAuth.onAuthStateChanged(firebaseUser => {
+                        setUser(firebaseUser);
+                        setIsFirebaseReady(true); // Firebase Auth is ready
+                        if (firebaseUser) {
+                            console.log("Firebase User:", firebaseUser.uid, firebaseUser.displayName || firebaseUser.email || "Anonymous");
+                            setMessage(`已登入: ${firebaseUser.displayName || firebaseUser.email || '匿名使用者'}`);
+                        } else {
+                            console.log("No Firebase user logged in.");
+                            setMessage('請登入以查看資料。');
+                        }
+                    });
+                    return () => unsubscribe();
+                } else {
+                    // Fallback for environments where Firebase is not globally available
+                    setIsFirebaseReady(true);
+                    setMessage('Firebase 未初始化，使用模擬資料。');
+                }
+            }, []);
+
+
+            // Fetch borrowers from Firestore
+            React.useEffect(() => {
+                let unsubscribeFirestore = null;
+                const fetchBorrowersFromFirestore = () => {
+                    if (window.firebaseDb && window.getCurrentUserId()) {
+                        const db = window.firebaseDb;
+                        // Corrected collection path to include 'data' segment
+                        const borrowersCollectionRef = window.getFirestoreCollection(`artifacts/${window.canvasAppId}/public/data/borrowers`);
+
+                        unsubscribeFirestore = window.onFirestoreSnapshot(borrowersCollectionRef, (snapshot) => {
+                            const fetchedBorrowers = snapshot.docs.map(doc => ({
+                                id: doc.id,
+                                ...doc.data()
+                            }));
+                            setBorrowers(fetchedBorrowers);
+                            setMessage('借款人資料已從雲端載入。');
+                        }, (error) => {
+                            console.error("Error fetching borrowers from Firestore:", error);
+                            setMessage('從雲端載入借款人資料失敗。');
+                        });
+                    } else {
+                        // If Firebase not ready or user not logged in, use mock data
+                        const mockData = [
+                            {
+                                id: '1',
+                                name: '王小明',
+                                loanAmount: 10000, // 初始借款金額，作為參考
+                                interestRate: 5, // 5%
+                                interestPeriod: '年',
+                                repaymentType: '分期數',
+                                installments: 12,
+                                repaymentPeriod: '月',
+                                monthlyPaymentDay: 15,
+                                weeklyPaymentDay: '',
+                                tenDayPaymentDays: '',
+                                loanDate: '2023-01-01',
+                                dueDate: '2024-01-01',
+                                contact: '0912345678',
+                                address: '台北市信義區忠孝東路100號',
+                                occupation: '工程師',
+                                companyPhone: '02-12345678',
+                                companyAddress: '台北市內湖區瑞光路200號',
+                                disbursementMethod: '銀行轉帳',
+                                emergencyContact1Name: '王大明',
+                                emergencyContact1Phone: '0911223344',
+                                emergencyContact2Name: '李小花',
+                                emergencyContact2Phone: '0933445566',
+                                notes: '初次借款，信用良好。',
+                                dailyLatePenaltyPercentage: 0.1, // 每日遲繳罰款百分比
+                                transactions: [
+                                    { type: '出款', amount: 10000, date: '2023-01-01', category: '本金出款', note: '首次出款' },
+                                    { type: '還款', amount: 1000, date: '2023-02-15', category: '本金利息', note: '第一期還款' },
+                                    { type: '還款', amount: 1000, date: '2023-03-17', category: '本金利息', note: '第二期還款 (遲繳 2 日, 罰款 $20.00)', penaltyAmount: 20 },
+                                ],
+                                events: [ // 新增事件模擬資料
+                                    { date: '2023-01-05', description: '電話聯繫，確認資料。' },
+                                    { date: '2023-03-20', description: '發送逾期通知。' },
+                                ],
+                                amountPerPeriod: 0
+                            },
+                            {
+                                id: '2',
+                                name: '陳美麗',
+                                loanAmount: 50000,
+                                interestRate: 0.5, // 0.5%
+                                interestPeriod: '月',
+                                repaymentType: '純繳利息',
+                                installments: '',
+                                repaymentPeriod: '周',
+                                monthlyPaymentDay: '',
+                                weeklyPaymentDay: '星期三',
+                                tenDayPaymentDays: '',
+                                loanDate: '2023-03-01',
+                                dueDate: '',
+                                contact: '0987654321',
+                                address: '高雄市左營區博愛路300號',
+                                occupation: '設計師',
+                                companyPhone: '',
+                                companyAddress: '',
+                                disbursementMethod: '現金',
+                                emergencyContact1Name: '',
+                                emergencyContact1Phone: '',
+                                emergencyContact2Name: '',
+                                emergencyContact2Phone: '',
+                                notes: '擴展業務資金。',
+                                dailyLatePenaltyPercentage: 0.05,
+                                transactions: [
+                                    { type: '出款', amount: 50000, date: '2023-03-01', category: '本金出款', note: '首次出款' },
+                                    { type: '還款', amount: 250, date: '2023-03-08', category: '利息', note: '第一期利息' },
+                                ],
+                                events: [], // 沒有事件
+                                amountPerPeriod: 0
+                            },
+                        ];
+                        setBorrowers(mockData);
+                        setMessage('Firebase 未連接，使用模擬資料。');
+                    }
+                };
+
+                if (isFirebaseReady) { // Only fetch data once Firebase Auth is ready
+                    fetchBorrowersFromFirestore();
+                }
+
+                return () => {
+                    if (unsubscribeFirestore) unsubscribeFirestore(); // Cleanup Firestore listener
+                };
+            }, [isFirebaseReady, user]); // Re-run when Firebase ready or user changes
+
+
+            // 處理新增借款人
+            const handleAddBorrower = async (newBorrower) => {
+                setMessage('正在新增借款人...');
+                try {
+                    const db = window.firebaseDb;
+                    if (!db || !user) { // Require user to be logged in
+                        setMessage('請先登入才能新增借款人。');
+                        return;
+                    }
+                    // Corrected collection path
+                    const borrowersCollectionRef = window.getFirestoreCollection(`artifacts/${window.canvasAppId}/public/data/borrowers`);
+                    const docRef = await window.addFirestoreDoc(borrowersCollectionRef, {
+                        ...newBorrower,
+                        // Ensure transactions and events are always arrays
+                        transactions: newBorrower.transactions || [{
+                            type: '出款',
+                            amount: parseFloat(newBorrower.loanAmount),
+                            date: newBorrower.loanDate,
+                            category: '本金出款',
+                            note: '首次借款出款',
+                        }],
+                        events: newBorrower.events || [],
+                        ownerId: user.uid, // Assign owner ID
+                    });
+                    setMessage('借款人新增成功！');
+                    setShowForm(false);
+                } catch (error) {
+                    console.error('新增借款人失敗:', error);
+                    setMessage(`新增借款人失敗: ${error.message}`);
+                }
+            };
+
+            // 處理更新借款人
+            const handleUpdateBorrower = async (updatedBorrower) => {
+                setMessage('正在更新借款人資料...');
+                try {
+                    const db = window.firebaseDb;
+                    if (!db || !user) { // Require user to be logged in
+                        setMessage('請先登入才能更新借款人。');
+                        return;
+                    }
+                    // Corrected document path
+                    const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/public/data/borrowers/${updatedBorrower.id}`);
+                    await window.setFirestoreDoc(borrowerDocRef, updatedBorrower); // Overwrites the document
+                    setMessage('借款人資料更新成功！');
+                    setSelectedBorrowerId(null);
+                    setShowForm(false);
+                } catch (error) {
+                    console.error('更新借款人失敗:', error);
+                    setMessage(`更新借款人失敗: ${error.message}`);
+                }
+            };
+
+            // 處理刪除借款人
+            const handleDeleteBorrower = (id) => {
+                setMessage('正在刪除借款人...');
+                const confirmDelete = async () => {
+                    try {
+                        const db = window.firebaseDb;
+                        if (!db || !user) { // Require user to be logged in
+                            setMessage('請先登入才能刪除借款人。');
+                            return;
+                        }
+                        // Corrected document path
+                        const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/public/data/borrowers/${id}`);
+                        await window.deleteFirestoreDoc(borrowerDocRef);
+                        setMessage('借款人刪除成功！');
+                    } catch (error) {
+                        console.error('刪除借款人失敗:', error);
+                        setMessage(`刪除借款人失敗: ${error.message}`);
+                    }
+                };
+                if (window.confirm('確定要刪除此借款人嗎？')) {
+                    confirmDelete();
+                }
+            };
+
+            // 處理更新借款人的金流記錄 (包含新增、編輯、刪除)
+            const handleUpdateBorrowerTransactions = async (borrowerId, updatedTransactionsArray) => {
+                console.log("App.js: handleUpdateBorrowerTransactions received for borrowerId:", borrowerId, "New transactions:", updatedTransactionsArray);
+                setMessage('正在更新金流記錄...');
+                try {
+                    const db = window.firebaseDb;
+                    if (!db || !user) { // Require user to be logged in
+                        setMessage('請先登入才能更新金流記錄。');
+                        return;
+                    }
+                    // Corrected document path
+                    const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/public/data/borrowers/${borrowerId}`);
+                    await window.updateFirestoreDoc(borrowerDocRef, { transactions: updatedTransactionsArray });
+                    setMessage('金流記錄更新成功！');
+                } catch (error) {
+                    console.error('更新金流記錄失敗:', error);
+                    setMessage(`更新金流記錄失敗: ${error.message}`);
+                }
+            };
+
+            // 處理更新借款人的事件記錄
+            const handleUpdateBorrowerEvents = async (borrowerId, updatedEventsArray) => {
+                setMessage('正在更新事件記錄...');
+                try {
+                    const db = window.firebaseDb;
+                    if (!db || !user) { // Require user to be logged in
+                        setMessage('請先登入才能更新事件記錄。');
+                        return;
+                    }
+                    // Corrected document path
+                    const borrowerDocRef = window.getFirestoreDoc(`artifacts/${window.canvasAppId}/public/data/borrowers/${borrowerId}`);
+                    await window.updateFirestoreDoc(borrowerDocRef, { events: updatedEventsArray });
+                    setMessage('事件記錄更新成功！');
+                } catch (error) {
+                    console.error('更新事件記錄失敗:', error);
+                    setMessage(`更新事件記錄失敗: ${error.message}`);
+                }
+            };
+
+            // 處理資料導出 (CSV)
+            const handleExportCsvData = () => {
+                try {
+                    const headers = [
+                        'ID', '姓名', '借款金額(初始本金)', '利率(%)', '利率週期', '還款方式', '分期數',
+                        '還款週期', '每月繳款日', '每周繳款日', '10天繳款日', '借款日期', '到期日',
+                        '聯絡方式', '現居地址', '職業', '公司電話', '公司地址', '出款模式',
+                        '緊急聯絡人1姓名', '緊急聯絡人1電話', '緊急聯絡人2姓名', '緊急聯絡人2電話',
+                        '備註', '每日遲繳罰款總借款的%數', '總出款金額', '金流收入', '金流狀況', '每期應繳金額'
+                    ];
+
+                    const csvRows = [];
+                    csvRows.push(headers.join(','));
+
+                    borrowers.forEach(borrower => {
+                        const totalCashInflow = borrower.transactions
+                            .filter(t => t.type === '還款')
+                            .reduce((sum, t) => sum + t.amount + (t.penaltyAmount || 0), 0);
+                        const totalCashOutflow = borrower.transactions
+                            .filter(t => t.type === '出款')
+                            .reduce((sum, t) => sum + t.amount, 0);
+                        const cashFlowStatus = totalCashInflow - totalCashOutflow;
+
+                        const rowData = [
+                            borrower.id,
+                            borrower.name,
+                            borrower.loanAmount,
+                            borrower.interestRate,
+                            borrower.interestPeriod,
+                            borrower.repaymentType,
+                            borrower.installments,
+                            borrower.repaymentPeriod,
+                            borrower.monthlyPaymentDay,
+                            borrower.weeklyPaymentDay,
+                            borrower.tenDayPaymentDays,
+                            borrower.loanDate,
+                            borrower.dueDate,
+                            borrower.contact,
+                            `"${borrower.address}"`,
+                            borrower.occupation,
+                            borrower.companyPhone,
+                            `"${borrower.companyAddress}"`,
+                            borrower.disbursementMethod,
+                            borrower.emergencyContact1Name,
+                            borrower.emergencyContact1Phone,
+                            borrower.emergencyContact2Name,
+                            borrower.emergencyContact2Phone,
+                            `"${borrower.notes}"`,
+                            borrower.dailyLatePenaltyPercentage,
+                            totalCashOutflow,
+                            totalCashInflow,
+                            cashFlowStatus,
+                            borrower.amountPerPeriod
+                        ];
+                        csvRows.push(rowData.map(field => {
+                            if (typeof field === 'string' && (field.includes(',') || field.includes('"') || field.includes('\n'))) {
+                                return `"${field.replace(/"/g, '""')}"`;
+                            }
+                            return field;
+                        }).join(','));
+                    });
+
+                    const csvString = '\uFEFF' + csvRows.join('\n');
+                    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const date = new Date();
+                    const filename = `loan_crm_summary_data_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.csv`;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    setMessage('資料已成功導出為 CSV！');
+                } catch (error) {
+                    console.error('導出 CSV 資料失敗:', error);
+                    setMessage('導出 CSV 資料失敗。');
+                }
+            };
+
+
+            // 根據選中的借款人ID獲取借款人資料
+            const selectedBorrower = borrowers.find((b) => b.id === selectedBorrowerId);
+
+            // 獲取當前時間
+            const [currentTime, setCurrentTime] = React.useState('');
+
+            React.useEffect(() => {
+                const updateTime = () => {
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                    const day = now.getDate().toString().padStart(2, '0');
+                    const hours = now.getHours().toString().padStart(2, '0');
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    setCurrentTime(`${year}/${month}/${day} ${hours}:${minutes}`);
+                };
+
+                updateTime(); // Set initial time
+                const intervalId = setInterval(updateTime, 60 * 1000); // Update every minute
+
+                return () => clearInterval(intervalId); // Cleanup interval
+            }, []);
+
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 p-4 font-inter text-gray-800">
+                    <header className="mb-8 text-center">
+                        <h1 className="text-4xl font-extrabold text-red-700 drop-shadow-md">小額借款CRM</h1>
+                        <p className="mt-2 text-lg text-gray-600">管理借款人資料與還款情況</p>
+                        {isFirebaseReady && (
+                            <div className="mt-4">
+                                {user ? (
+                                    <div className="flex items-center justify-center space-x-4">
+                                        <span className="text-gray-700">歡迎，{user.displayName || user.email || '匿名使用者'}！</span>
+                                        <button
+                                            onClick={window.signOutUser}
+                                            className="rounded-full bg-red-500 px-4 py-2 text-white shadow-md hover:bg-red-600 transition duration-300"
+                                        >
+                                            登出
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={window.signInWithGoogle}
+                                        className="rounded-full bg-blue-500 px-6 py-3 text-white shadow-lg hover:bg-blue-600 transition duration-300 ease-in-out transform hover:scale-105"
+                                    >
+                                        使用 Google 登入
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </header>
+
+                    {message && (
+                        <div className="mb-4 rounded-lg bg-red-100 p-3 text-center text-red-800 shadow-sm">
+                            {message}
+                        </div>
+                    )}
+
+                    {/* 主介面：顯示列表或表單 */}
+                    {!selectedBorrowerId && !showForm && user && ( // Only show if user is logged in
+                        <div className="mx-auto max-w-4xl rounded-xl bg-white p-6 shadow-2xl">
+                            <div className="mb-6 flex justify-between items-center">
+                                <h2 className="text-2xl font-semibold text-red-600">借款人列表</h2>
+                                <div className="flex space-x-3">
+                                    {/* 導出 CSV 按鈕 */}
+                                    <button
+                                        onClick={handleExportCsvData}
+                                        className="rounded-full bg-blue-600 px-4 py-2 text-white shadow-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105 text-sm"
+                                    >
+                                        導出 CSV
+                                    </button>
+                                    {/* 新增借款人按鈕 */}
+                                    <button
+                                        onClick={() => setShowForm(true)}
+                                        className="rounded-full bg-red-600 px-6 py-3 text-white shadow-lg hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105"
+                                    >
+                                        + 新增借款人
+                                    </button>
+                                </div>
+                            </div>
+
+                            {borrowers.length === 0 ? (
+                                <p className="text-center text-gray-500">目前沒有借款人資料。</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-md">
+                                        <thead className="bg-red-50 border-b border-red-200">
+                                            <tr>
+                                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">姓名</th>
+                                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">借款金額</th>
+                                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">金流狀況</th> {/* 新增金流狀況標題 */}
+                                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">借款日期</th>
+                                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">到期日</th>
+                                                <th className="py-3 px-4 text-left text-sm font-medium text-gray-700 uppercase tracking-wider">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {borrowers.map((borrower) => {
+                                                // 計算金流狀況
+                                                const totalCashInflow = borrower.transactions
+                                                    .filter(t => t.type === '還款')
+                                                    .reduce((sum, t) => sum + t.amount + (t.penaltyAmount || 0), 0);
+                                                const totalCashOutflow = borrower.transactions
+                                                    .filter(t => t.type === '出款')
+                                                    .reduce((sum, t) => sum + t.amount, 0);
+                                                const cashFlowStatus = totalCashInflow - totalCashOutflow;
+
+                                                return (
+                                                    <tr key={borrower.id} className="hover:bg-gray-50 transition duration-150 ease-in-out">
+                                                        <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{borrower.name}</td>
+                                                        <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">${borrower.loanAmount.toLocaleString()}</td>
+                                                        <td className={`py-3 px-4 whitespace-nowrap text-sm font-semibold ${cashFlowStatus < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                            ${cashFlowStatus.toLocaleString()}
+                                                        </td>
+                                                        <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{borrower.loanDate}</td>
+                                                        <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{borrower.dueDate || 'N/A'}</td>
+                                                        <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
+                                                            <button
+                                                                onClick={() => setSelectedBorrowerId(borrower.id)}
+                                                                className="text-red-600 hover:text-red-900 mr-3 transition duration-150 ease-in-out"
+                                                            >
+                                                                查看/編輯
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteBorrower(borrower.id)}
+                                                                className="text-red-600 hover:text-red-900 transition duration-150 ease-in-out"
+                                                            >
+                                                                刪除
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 新增/編輯借款人表單 */}
+                    {(showForm || selectedBorrowerId) && user && ( // Only show if user is logged in
+                        <BorrowerForm
+                            borrower={selectedBorrower} // 如果是編輯模式，傳入現有資料
+                            onSave={selectedBorrower ? handleUpdateBorrower : handleAddBorrower}
+                            onCancel={() => {
+                                setShowForm(false);
+                                setSelectedBorrowerId(null);
+                            }}
+                            // 將更新金流記錄的函數傳遞給子組件
+                            onUpdateBorrowerTransactions={handleUpdateBorrowerTransactions}
+                            onUpdateBorrowerEvents={handleUpdateBorrowerEvents} // 傳遞事件更新函數
+                        />
+                    )}
+
+                    {/* 底部版本資訊 */}
+                    <footer className="mt-8 text-center text-gray-500 text-sm flex justify-between items-center px-4">
+                        <span>版本: {appVersion}</span>
+                        <span className="text-gray-600">{currentTime}</span>
+                    </footer>
+
+                    {/* 更新紀錄彈跳視窗 (仍然定義，但不再有導覽按鈕觸發) */}
+                    {showUpdateHistoryModal && (
+                        <UpdateHistoryModal onClose={() => setShowUpdateHistoryModal(false)} />
+                    )}
+                </div>
+            );
+        }; // End of App component
+
+        // Mount the App component to the DOM
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
