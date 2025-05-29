@@ -202,6 +202,11 @@
             // Version history data
             const versionHistoryData = [
                 {
+                    version: "1.9.6",
+                    date: "2025-05-30",
+                    content: "客戶列表頁面優化：移除「淨利」欄位。金流紀錄列表：確認排序為最新新增的紀錄顯示在最上方。",
+                },
+                {
                     version: "1.9.5",
                     date: "2025-05-30",
                     content: "偵錯顯示問題：確保應用程式在無資料時能正常顯示「沒有符合篩選條件的交易紀錄」訊息。優化錯誤處理和載入狀態。",
@@ -695,7 +700,6 @@
                     const docSnap = await window.firebase.getDoc(docRef);
 
                     if (docSnap.exists()) {
-                        const recordData = docSnap.data();
                         let calculatedActualProfit = 0; // Initialize to 0 for calculation
 
                         // Fetch cash flows for this specific transaction to calculate actual profit
@@ -868,6 +872,26 @@
                     setNewCashFlowAmount('');
                     setNewCashFlowItem('本金+利息');
                     setNewCashFlowNotes('');
+
+                    // After saving cash flow, re-calculate and update actualProfit on the parent transaction
+                    const parentTransactionDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions`, editingRecordId);
+                    const cashFlowsSnapshot = await window.firebase.getDocs(cashFlowsCollectionRef);
+                    let totalIncomingForLoan = 0;
+                    let totalOutgoingForLoan = 0;
+                    cashFlowsSnapshot.forEach(cfDoc => {
+                        const cfData = cfDoc.data();
+                        if (cfData.type === '還款') {
+                            totalIncomingForLoan += cfData.amount;
+                        } else if (cfData.type === '出款') {
+                            totalOutgoingForLoan += cfData.amount;
+                        }
+                    });
+                    const calculatedActualProfit = totalIncomingForLoan - totalOutgoingForLoan;
+                    await window.firebase.updateDoc(parentTransactionDocRef, {
+                        actualProfit: calculatedActualProfit,
+                    });
+
+
                 } catch (error) {
                     console.error("Error saving cash flow document:", error);
                     setErrorMessage("儲存金流紀錄失敗。");
@@ -885,6 +909,26 @@
                     const docRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/cashFlows`, cashFlowId);
                     await window.firebase.deleteDoc(docRef);
                     setErrorMessage("金流紀錄已成功刪除。");
+
+                    // After deleting cash flow, re-calculate and update actualProfit on the parent transaction
+                    const parentTransactionDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions`, editingRecordId);
+                    const cashFlowsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/cashFlows`);
+                    const cashFlowsSnapshot = await window.firebase.getDocs(cashFlowsCollectionRef);
+                    let totalIncomingForLoan = 0;
+                    let totalOutgoingForLoan = 0;
+                    cashFlowsSnapshot.forEach(cfDoc => {
+                        const cfData = cfDoc.data();
+                        if (cfData.type === '還款') {
+                            totalIncomingForLoan += cfData.amount;
+                        } else if (cfData.type === '出款') {
+                            totalOutgoingForLoan += cfData.amount;
+                        }
+                    });
+                    const calculatedActualProfit = totalIncomingForLoan - totalOutgoingForLoan;
+                    await window.firebase.updateDoc(parentTransactionDocRef, {
+                        actualProfit: calculatedActualProfit,
+                    });
+
                 } catch (error) {
                     console.error("Error deleting cash flow document:", error);
                     setErrorMessage("刪除金流紀錄失敗。");
@@ -1077,20 +1121,17 @@
                     return;
                 }
 
-                const headers = ["序號", "借款日期", "客戶名稱", "借款金額", "淨利", "利率(%)", "還款方式", "期數", "實際結果", "聯絡方式", "住址", "居住地", "職業", "公司電話", "公司地址", "出款備註", "緊急聯絡人1", "緊急聯絡人1電話", "緊急聯絡人2", "緊急聯絡人2電話", "一般備註"];
+                const headers = ["序號", "借款日期", "客戶名稱", "借款金額", "利率(%)", "還款方式", "期數", "實際結果", "聯絡方式", "住址", "居住地", "職業", "公司電話", "公司地址", "出款備註", "緊急聯絡人1", "緊急聯絡人1電話", "緊急聯絡人2", "緊急聯絡人2電話", "一般備註"];
                 const csvRows = [];
 
                 csvRows.push(headers.join(','));
 
                 filteredTransactionsHistory.forEach((record, index) => {
-                    const netProfitValue = calculateLoanNetProfit(record.id);
-                    const netProfitDisplay = netProfitValue !== null ? netProfitValue.toFixed(2) : '待計算';
                     const row = [
                         index + 1,
                         record.date.substring(0, 10), // Only date part
                         record.clientName,
                         record.loanAmount,
-                        netProfitDisplay, // Added Net Profit
                         record.interestRate,
                         record.repaymentMethod,
                         record.loanTerm || 'N/A',
@@ -1174,7 +1215,6 @@
                                     <th>借款日期</th>
                                     <th>客戶名稱</th>
                                     <th>借款金額</th>
-                                    <th>淨利</th>
                                     <th>利率(%)</th>
                                     <th>還款方式</th>
                                     <th>期數</th>
@@ -1188,7 +1228,6 @@
                                         <td>${record.date.substring(0, 10)}</td>
                                         <td>${record.clientName}</td>
                                         <td>${record.loanAmount}</td>
-                                        <td>${calculateLoanNetProfit(record.id) !== null ? calculateLoanNetProfit(record.id).toFixed(2) : '待計算'}</td>
                                         <td>${record.interestRate}</td>
                                         <td>${record.repaymentMethod}</td>
                                         <td>${record.loanTerm || 'N/A'}</td>
@@ -1883,7 +1922,6 @@
                                                         <th className="py-3 px-6 text-left">借款日期</th>
                                                         <th className="py-3 px-6 text-left">客戶名稱</th>
                                                         <th className="py-3 px-6 text-left">借款金額</th>
-                                                        <th className="py-3 px-6 text-left">淨利</th> {/* Added Net Profit */}
                                                         <th className="py-3 px-6 text-left">利率(%)</th>
                                                         <th className="py-3 px-6 text-left">還款方式</th>
                                                         <th className="py-3 px-6 text-left">期數</th>
@@ -1898,9 +1936,6 @@
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.date.substring(0, 10)}</td> {/* Only date part */}
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.clientName}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanAmount}</td>
-                                                            <td className={`py-3 px-6 text-left whitespace-nowrap ${calculateLoanNetProfit(record.id) !== null && calculateLoanNetProfit(record.id) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                {calculateLoanNetProfit(record.id) !== null ? calculateLoanNetProfit(record.id).toFixed(2) : '待計算'}
-                                                            </td> {/* Display Net Profit */}
                                                             <td className="py-3 px-6 text-left">{record.interestRate}</td>
                                                             {/* Removed Interest Rate Period */}
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.repaymentMethod}</td>
