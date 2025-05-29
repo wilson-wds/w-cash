@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>系統 (CRM)</title>
+    <title>金融業客戶關係管理系統 (CRM)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -369,7 +369,7 @@
                 };
             }, [db, isAuthReady, userId]);
 
-            // Calculate projected return and required investment (可能需要重新定義或移除)
+            // Calculate projected return and required investment (可能需要重新定義其含義或移除)
             const calculateInstantResults = React.useCallback(() => {
                 const parsedLoanAmount = parseFloat(loanAmount);
                 const parsedInterestRate = parseFloat(interestRate);
