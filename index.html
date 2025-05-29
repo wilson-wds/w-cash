@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金融業客戶關係管理系統 (CRM)</title>
+    <title>系統 (CRM)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -152,22 +152,22 @@
 
             // Client and Transaction input states
             const [clientName, setClientName] = React.useState('');
-            const [contactInfo, setContactInfo] = React.useState('');
-            const [productType, setProductType] = React.useState('');
-            const [transactionAmount, setTransactionAmount] = React.useState('');
-            const [expectedReturnRate, setExpectedReturnRate] = React.useState(''); // New: percentage
-            const [notes, setNotes] = React.useState('');
-            const [projectedReturn, setProjectedReturn] = React.useState(null);
+            const [loanAmount, setLoanAmount] = React.useState(''); // 聯絡資訊 -> 借款金額
+            const [interestRate, setInterestRate] = React.useState(''); // 產品/服務類型 -> 利率
+            const [interestRatePeriod, setInterestRatePeriod] = React.useState('年'); // 利率週期 (年/月/日)
+            const [repaymentMethod, setRepaymentMethod] = React.useState('本+利'); // 交易金額 -> 還款方式
+            const [loanTerm, setLoanTerm] = React.useState(''); // 新增：期數
+            const [notes, setNotes] = React.useState(''); // 備註
+            const [projectedReturn, setProjectedReturn] = React.useState(null); // 預期報酬 (這裡可能需要重新定義其含義或移除)
             const [errorMessage, setErrorMessage] = React.useState('');
             const [transactionsHistory, setTransactionsHistory] = React.useState([]);
 
             // Filter states
             const [startDate, setStartDate] = React.useState(getTodayDateString());
             const [endDate, setEndDate] = React.useState(getTodayDateString());
-            const [selectedProductTypeFilter, setSelectedProductTypeFilter] = React.useState('');
-            const [selectedOutcomeStatusFilter, setSelectedOutcomeStatusFilter] = React.useState(''); // New filter for transaction status
+            // Removed selectedInterestRatePeriodFilter, selectedRepaymentMethodFilter, selectedOutcomeStatusFilter
 
-            // Target Goal Calculation states
+            // Target Goal Calculation states (可能需要重新定義或移除)
             const [targetGoalAmount, setTargetGoalAmount] = React.useState('');
             const [requiredInvestmentForGoal, setRequiredInvestmentForGoal] = React.useState(null);
 
@@ -178,6 +178,16 @@
 
             // Version history data
             const versionHistoryData = [
+                {
+                    version: "1.5",
+                    date: "2025-05-30",
+                    content: "客戶列表頁面優化：將「客戶借貸紀錄」改為「客戶列表」，移除多餘篩選器，並調整統計數據顯示。",
+                },
+                {
+                    version: "1.4",
+                    date: "2025-05-30",
+                    content: "新增客戶交易/互動頁面改版：聯絡資訊改為借款金額，產品服務類型改為利率及利率週期，交易金額改為還款方式，並新增期數欄位。",
+                },
                 {
                     version: "1.3",
                     date: "2025-05-29",
@@ -203,17 +213,17 @@
             const [showUpdateLogModal, setShowUpdateLogModal] = React.useState(false);
             const [showSettingsModal, setShowSettingsModal] = React.useState(false);
 
-            // States for managing unique product types and outcome types in settings
-            const [managedProductTypes, setManagedProductTypes] = React.useState([]);
+            // States for managing unique product types (now for repayment methods & interest rate periods) in settings
+            const [managedInterestRatePeriods, setManagedInterestRatePeriods] = React.useState(['年', '月', '日']); // Fixed options
+            const [managedRepaymentMethods, setManagedRepaymentMethods] = React.useState(['本+利', '純繳利息']); // Fixed options
             const [managedOutcomeTypes, setManagedOutcomeTypes] = React.useState([]);
-            const [newProductTypeInput, setNewProductTypeInput] = React.useState('');
             const [newOutcomeTypeInput, setNewOutcomeTypeInput] = React.useState('');
+
 
             // --- Firebase Initialization and Authentication ---
             React.useEffect(() => {
                 const initializeFirebase = async () => {
                     try {
-                        // Access global variables defined in the HTML script tags
                         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
                         const app = window.firebase.initializeApp(firebaseConfig);
                         const authInstance = window.firebase.getAuth(app);
@@ -222,7 +232,6 @@
                         setAuth(authInstance);
                         setDb(dbInstance);
 
-                        // Log config for debugging
                         console.log("Firebase Config:", firebaseConfig);
 
                         const unsubscribe = window.firebase.onAuthStateChanged(authInstance, async (user) => {
@@ -230,7 +239,7 @@
                                 setUserId(user.uid);
                                 setUserName(user.displayName || user.email || '匿名用戶');
                                 setUserEmail(user.email);
-                                console.log("User signed in:", user.uid); // Log user ID
+                                console.log("User signed in:", user.uid);
                             } else {
                                 try {
                                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== '') {
@@ -260,20 +269,12 @@
                 initializeFirebase();
             }, []);
 
-            // --- Load managed product types and outcome types from Firestore ---
+            // --- Load managed outcome types from Firestore ---
             React.useEffect(() => {
                 if (!db || !isAuthReady || !userId) return;
 
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const productTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
                 const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
-
-                const unsubscribeProductTypes = window.firebase.onSnapshot(productTypesRef, (snapshot) => {
-                    const types = snapshot.docs.map(doc => doc.id);
-                    setManagedProductTypes(types.sort());
-                }, (error) => {
-                    console.error("Error fetching product types:", error);
-                });
 
                 const unsubscribeOutcomeTypes = window.firebase.onSnapshot(outcomeTypesRef, (snapshot) => {
                     const types = snapshot.docs.map(doc => doc.id);
@@ -283,7 +284,6 @@
                 });
 
                 return () => {
-                    unsubscribeProductTypes();
                     unsubscribeOutcomeTypes();
                 };
             }, [db, isAuthReady, userId]);
@@ -369,29 +369,33 @@
                 };
             }, [db, isAuthReady, userId]);
 
-            // Calculate projected return and required investment
+            // Calculate projected return and required investment (可能需要重新定義或移除)
             const calculateInstantResults = React.useCallback(() => {
-                const parsedTransactionAmount = parseFloat(transactionAmount);
-                const parsedExpectedReturnRate = parseFloat(expectedReturnRate); // As a percentage
+                const parsedLoanAmount = parseFloat(loanAmount);
+                const parsedInterestRate = parseFloat(interestRate);
 
-                if (isNaN(parsedTransactionAmount) || parsedTransactionAmount <= 0 || isNaN(parsedExpectedReturnRate)) {
+                // For loan specific calculations, you'd need a more complex formula
+                // For now, let's just make sure inputs are valid
+                if (isNaN(parsedLoanAmount) || parsedLoanAmount <= 0 || isNaN(parsedInterestRate)) {
                     setProjectedReturn(null);
                 } else {
-                    const projected = parsedTransactionAmount * (parsedExpectedReturnRate / 100);
-                    setProjectedReturn(projected.toFixed(2));
+                    // Example: simple interest calculation for display purposes
+                    const annualInterest = parsedLoanAmount * (parsedInterestRate / 100);
+                    setProjectedReturn(annualInterest.toFixed(2));
                 }
 
-                if (isNaN(targetGoalAmount) || parseFloat(targetGoalAmount) <= 0 || isNaN(parsedExpectedReturnRate) || parsedExpectedReturnRate <= 0) {
+                // Target goal calculation might not be directly applicable here unless it's a specific loan target
+                if (isNaN(targetGoalAmount) || parseFloat(targetGoalAmount) <= 0 || isNaN(parsedInterestRate) || parsedInterestRate <= 0) {
                     setRequiredInvestmentForGoal(null);
                 } else {
-                    const required = parseFloat(targetGoalAmount) / (parsedExpectedReturnRate / 100);
+                    const required = parseFloat(targetGoalAmount) / (parsedInterestRate / 100);
                     setRequiredInvestmentForGoal(required.toFixed(2));
                 }
-            }, [transactionAmount, expectedReturnRate, targetGoalAmount]);
+            }, [loanAmount, interestRate, targetGoalAmount]);
 
             React.useEffect(() => {
                 calculateInstantResults();
-            }, [transactionAmount, expectedReturnRate, targetGoalAmount, calculateInstantResults]);
+            }, [loanAmount, interestRate, targetGoalAmount, calculateInstantResults]);
 
             const handleSaveRecordButtonClick = async () => {
                 setErrorMessage('');
@@ -400,23 +404,32 @@
                     return;
                 }
 
-                const parsedTransactionAmount = parseFloat(transactionAmount);
-                const parsedExpectedReturnRate = parseFloat(expectedReturnRate);
+                const parsedLoanAmount = parseFloat(loanAmount);
+                const parsedInterestRate = parseFloat(interestRate);
+                const parsedLoanTerm = parseInt(loanTerm, 10);
 
                 if (clientName.trim() === '') {
                     setErrorMessage('請輸入客戶名稱。');
                     return;
                 }
-                if (isNaN(parsedTransactionAmount) || parsedTransactionAmount <= 0) {
-                    setErrorMessage('請輸入有效的交易金額 (必須是正數)。');
+                if (isNaN(parsedLoanAmount) || parsedLoanAmount <= 0) {
+                    setErrorMessage('請輸入有效的借款金額 (必須是正數)。');
                     return;
                 }
-                if (isNaN(parsedExpectedReturnRate)) {
-                    setErrorMessage('請輸入有效的預期報酬率。');
+                if (isNaN(parsedInterestRate) || parsedInterestRate < 0) {
+                    setErrorMessage('請輸入有效的利率 (必須大於或等於 0)。');
                     return;
                 }
-                if (productType.trim() === '') {
-                    setErrorMessage('請選擇或輸入產品/服務類型。');
+                if (interestRatePeriod.trim() === '') {
+                    setErrorMessage('請選擇利率週期。');
+                    return;
+                }
+                if (repaymentMethod.trim() === '') {
+                    setErrorMessage('請選擇還款方式。');
+                    return;
+                }
+                if (repaymentMethod === '本+利' && (isNaN(parsedLoanTerm) || parsedLoanTerm <= 0)) {
+                    setErrorMessage('選擇「本+利」還款方式時，期數必須是正數。');
                     return;
                 }
 
@@ -434,43 +447,34 @@
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
                     const transactionsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions`);
 
+                    const recordData = {
+                        clientName: clientName.trim(),
+                        loanAmount: parsedLoanAmount, // 借款金額
+                        interestRate: parsedInterestRate, // 利率
+                        interestRatePeriod: interestRatePeriod.trim(), // 利率週期
+                        repaymentMethod: repaymentMethod.trim(), // 還款方式
+                        loanTerm: repaymentMethod === '本+利' ? parsedLoanTerm : null, // 期數
+                        notes: notes.trim(),
+                        actualOutcome: null,
+                        outcomeNotes: '',
+                        date: localDateTimeString,
+                        status: 'pending',
+                        timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
+                        addedBy: userId,
+                    };
+
                     if (editingRecordId) {
                         const docRef = window.firebase.doc(transactionsCollectionRef, editingRecordId);
-                        await window.firebase.updateDoc(docRef, {
-                            clientName: clientName.trim(),
-                            contactInfo: contactInfo.trim(),
-                            productType: productType.trim(),
-                            transactionAmount: parsedTransactionAmount,
-                            expectedReturnRate: parsedExpectedReturnRate,
-                            notes: notes.trim(),
-                        });
+                        await window.firebase.updateDoc(docRef, recordData);
                         setErrorMessage("紀錄已成功更新。");
                         setEditingRecordId(null);
                     } else {
-                        await window.firebase.addDoc(transactionsCollectionRef, {
-                            clientName: clientName.trim(),
-                            contactInfo: contactInfo.trim(),
-                            productType: productType.trim(),
-                            transactionAmount: parsedTransactionAmount,
-                            expectedReturnRate: parsedExpectedReturnRate,
-                            notes: notes.trim(),
-                            actualOutcome: null, // e.g., 'successful', 'unsuccessful', 'pending'
-                            outcomeNotes: '',
-                            date: localDateTimeString,
-                            status: 'pending', // 'pending', 'completed_success', 'completed_failure'
-                            timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
-                            addedBy: userId,
-                        });
+                        await window.firebase.addDoc(transactionsCollectionRef, recordData);
                         setErrorMessage("新增紀錄成功。");
                     }
 
-                    // Also add new productType/outcomeType to managed lists if they don't exist
-                    const productTypesSettingsRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
+                    // Also add new outcomeType to managed lists if they don't exist
                     const outcomeTypesSettingsRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
-
-                    if (productType.trim() && !managedProductTypes.includes(productType.trim())) {
-                        await window.firebase.setDoc(window.firebase.doc(productTypesSettingsRef, productType.trim()), { exists: true });
-                    }
 
                     // Default outcome types if not already present
                     if (!managedOutcomeTypes.includes('成功')) {
@@ -483,8 +487,7 @@
                         await window.firebase.setDoc(window.firebase.doc(outcomeTypesSettingsRef, '待定'), { exists: true });
                     }
 
-
-                    resetFields(); // Clear fields after saving
+                    resetFields();
                 } catch (error) {
                     console.error("Error saving document:", error);
                     setErrorMessage("儲存紀錄失敗。");
@@ -504,16 +507,18 @@
 
                     if (docSnap.exists()) {
                         const recordData = docSnap.data();
-                        let actualReturn = 0;
+                        let actualReturn = 0; // This might need to be redefined for loan context (e.g., total interest paid)
                         if (newStatus === 'completed_success') {
-                            actualReturn = recordData.transactionAmount * (recordData.expectedReturnRate / 100);
+                            // Example: assuming 'success' means interest was collected.
+                            // This logic needs to be refined based on actual loan success metrics.
+                            actualReturn = recordData.loanAmount * (recordData.interestRate / 100);
                         } else if (newStatus === 'completed_failure') {
-                            actualReturn = -recordData.transactionAmount; // Represent loss as negative of amount
+                            actualReturn = -recordData.loanAmount; // Represent loss/default as negative of loan amount
                         }
 
                         await window.firebase.updateDoc(docRef, {
                             actualOutcome: newStatus,
-                            actualReturn: actualReturn,
+                            actualReturn: actualReturn, // Re-purpose for loan metrics
                             status: newStatus,
                             outcomeNotes: outcomeNotes,
                             settledBy: userId,
@@ -530,10 +535,11 @@
 
             const handleEditRecord = (record) => {
                 setClientName(record.clientName);
-                setContactInfo(record.contactInfo || '');
-                setProductType(record.productType);
-                setTransactionAmount(record.transactionAmount.toString());
-                setExpectedReturnRate(record.expectedReturnRate.toString());
+                setLoanAmount(record.loanAmount.toString());
+                setInterestRate(record.interestRate.toString());
+                setInterestRatePeriod(record.interestRatePeriod || '年');
+                setRepaymentMethod(record.repaymentMethod || '本+利');
+                setLoanTerm(record.loanTerm ? record.loanTerm.toString() : '');
                 setNotes(record.notes || '');
                 setEditingRecordId(record.id);
                 setErrorMessage('');
@@ -571,41 +577,8 @@
                 }
             };
 
-            // Functions to manage product types in settings
-            const handleAddManagedProductType = async () => {
-                if (newProductTypeInput.trim() === '') {
-                    setErrorMessage("請輸入有效的產品/服務類型名稱。");
-                    return;
-                }
-                if (managedProductTypes.includes(newProductTypeInput.trim())) {
-                    setErrorMessage("此產品/服務類型已存在。");
-                    return;
-                }
-                setErrorMessage('');
-                try {
-                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                    const productTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
-                    await window.firebase.setDoc(window.firebase.doc(productTypesRef, newProductTypeInput.trim()), { exists: true });
-                    setNewProductTypeInput('');
-                } catch (error) {
-                    console.error("Error adding product type:", error);
-                    setErrorMessage("新增產品/服務類型失敗。");
-                }
-            };
-
-            const handleDeleteManagedProductType = async (typeToDelete) => {
-                setErrorMessage('');
-                try {
-                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                    const productTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
-                    await window.firebase.deleteDoc(window.firebase.doc(productTypesRef, typeToDelete));
-                } catch (error) {
-                    console.error("Error deleting product type:", error);
-                    setErrorMessage("刪除產品/服務類型失敗。");
-                }
-            };
-
-            // Functions to manage outcome types in settings
+            // Functions to manage product types (now for repayment methods & interest rate periods) in settings
+            // These are now fixed options, so no add/delete functionality here
             const handleAddManagedOutcomeType = async () => {
                 if (newOutcomeTypeInput.trim() === '') {
                     setErrorMessage("請輸入有效的結果類型名稱。");
@@ -652,10 +625,8 @@
                     const isAfterStartDate = !startDateOnly || recordDate >= startDateOnly;
                     const isBeforeEndDate = !endDateOnly || recordDate <= endDateOnly;
 
-                    const isMatchingProductType = !selectedProductTypeFilter || record.productType === selectedProductTypeFilter;
-                    const isMatchingOutcomeStatus = !selectedOutcomeStatusFilter || record.status === selectedOutcomeStatusFilter;
-
-                    return isAfterStartDate && isBeforeEndDate && isMatchingProductType && isMatchingOutcomeStatus;
+                    // Removed filters for interestRatePeriod, repaymentMethod, outcomeStatus
+                    return isAfterStartDate && isBeforeEndDate;
                 });
                 // Sort by date in descending order (newest first)
                 return filtered.sort((a, b) => {
@@ -663,56 +634,43 @@
                     const dateB = new Date(b.date.replace(/-/g, '/')).getTime();
                     return dateB - dateA;
                 });
-            }, [transactionsHistory, startDate, endDate, selectedProductTypeFilter, selectedOutcomeStatusFilter]);
+            }, [transactionsHistory, startDate, endDate]); // Updated dependencies
 
-            const totalTransactionValueFiltered = filteredTransactionsHistory.reduce((sum, record) => {
-                return sum + record.transactionAmount;
+            // Adjust totals for loan context
+            const totalLoanAmountFiltered = filteredTransactionsHistory.reduce((sum, record) => {
+                return sum + record.loanAmount;
             }, 0).toFixed(2);
 
             const totalActualReturnFiltered = filteredTransactionsHistory.reduce((sum, record) => {
                 if (record.status === 'completed_success' || record.status === 'completed_failure') {
-                    return sum + record.actualReturn;
+                    return sum + record.actualReturn; // Re-purpose for loan metrics
                 }
                 return sum;
             }, 0).toFixed(2);
 
-            const { totalSuccessful, totalUnsuccessful, averageSuccessRate } = React.useMemo(() => {
-                let successful = 0;
-                let unsuccessful = 0;
+            const totalCustomers = React.useMemo(() => {
+                const uniqueClients = new Set();
                 filteredTransactionsHistory.forEach(record => {
-                    if (record.status === 'completed_success') {
-                        successful++;
-                    } else if (record.status === 'completed_failure') {
-                        unsuccessful++;
-                    }
+                    uniqueClients.add(record.clientName);
                 });
-                const totalSettledTransactions = successful + unsuccessful;
-                const avgSuccessRate = totalSettledTransactions > 0 ? ((successful / totalSettledTransactions) * 100).toFixed(2) : '0.00';
-                return { totalSuccessful: successful, totalUnsuccessful: unsuccessful, averageSuccessRate: avgSuccessRate };
+                return uniqueClients.size;
             }, [filteredTransactionsHistory]);
 
-            // Calculate product type counts for display
-            const productTypeCounts = React.useMemo(() => {
-                const counts = {};
-                filteredTransactionsHistory.forEach(record => {
-                    counts[record.productType] = (counts[record.productType] || 0) + 1;
-                });
-                return counts;
-            }, [filteredTransactionsHistory]);
+            // Removed interestRatePeriodCounts and repaymentMethodCounts
 
             const resetFields = () => {
                 setClientName('');
-                setContactInfo('');
-                setProductType('');
-                setTransactionAmount('');
-                setExpectedReturnRate('');
+                setLoanAmount('');
+                setInterestRate('');
+                setInterestRatePeriod('年');
+                setRepaymentMethod('本+利');
+                setLoanTerm('');
                 setNotes('');
                 setProjectedReturn(null);
                 setErrorMessage('');
                 setStartDate(getTodayDateString());
                 setEndDate(getTodayDateString());
-                setSelectedProductTypeFilter('');
-                setSelectedOutcomeStatusFilter('');
+                // Removed filter state resets
                 setTargetGoalAmount('');
                 setRequiredInvestmentForGoal(null);
                 setEditingRecordId(null);
@@ -724,7 +682,7 @@
                     return;
                 }
 
-                const headers = ["序號", "日期時間", "客戶名稱", "聯絡資訊", "產品/服務類型", "交易金額", "預期報酬率(%)", "實際結果", "實際報酬", "備註"];
+                const headers = ["序號", "日期時間", "客戶名稱", "借款金額", "利率(%)", "利率週期", "還款方式", "期數", "實際結果", "實際報酬", "備註"];
                 const csvRows = [];
 
                 csvRows.push(headers.join(','));
@@ -734,10 +692,11 @@
                         index + 1,
                         record.date,
                         record.clientName,
-                        record.contactInfo || '',
-                        record.productType,
-                        record.transactionAmount,
-                        record.expectedReturnRate,
+                        record.loanAmount,
+                        record.interestRate,
+                        record.interestRatePeriod,
+                        record.repaymentMethod,
+                        record.loanTerm || 'N/A', // Pure interest doesn't have term
                         record.status === 'pending' ? '待定' : (record.actualOutcome === 'completed_success' ? '成功' : '失敗'),
                         record.status === 'pending' ? '待定' : record.actualReturn.toFixed(2),
                         record.notes || ''
@@ -746,16 +705,10 @@
                 });
 
                 csvRows.push('');
-                csvRows.push(`篩選後總交易金額:,${totalTransactionValueFiltered} NTD`);
-                csvRows.push(`篩選後總實際報酬:,${totalActualReturnFiltered} NTD`);
-                csvRows.push(`成功交易數:,${totalSuccessful}`);
-                csvRows.push(`失敗交易數:,${totalUnsuccessful}`);
-                csvRows.push(`平均成功率:,${averageSuccessRate}%`);
-                csvRows.push('');
-                Object.entries(productTypeCounts).forEach(([type, count]) => {
-                    csvRows.push(`${type} 交易數:,${count}`);
-                });
-
+                csvRows.push(`總出款:,${totalLoanAmountFiltered} NTD`);
+                csvRows.push(`金流狀況:,${totalActualReturnFiltered} NTD`);
+                csvRows.push(`總客戶數:,${totalCustomers}`);
+                // Removed other statistics from CSV export
 
                 const csvString = csvRows.join('\n');
                 const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
@@ -782,7 +735,7 @@
                     <head>
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <title>交易紀錄列印</title>
+                        <title>客戶列表列印</title>
                         <style>
                             body { font-family: 'Inter', sans-serif; margin: 20px; }
                             h2 { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
@@ -807,16 +760,18 @@
                         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
                     </head>
                     <body>
-                        <h2>交易紀錄</h2>
+                        <h2>客戶列表</h2>
                         <table>
                             <thead>
                                 <tr>
                                     <th>序號</th>
                                     <th>日期時間</th>
                                     <th>客戶名稱</th>
-                                    <th>產品/服務類型</th>
-                                    <th>交易金額</th>
-                                    <th>預期報酬率(%)</th>
+                                    <th>借款金額</th>
+                                    <th>利率(%)</th>
+                                    <th>利率週期</th>
+                                    <th>還款方式</th>
+                                    <th>期數</th>
                                     <th>實際結果</th>
                                     <th>實際報酬</th>
                                 </tr>
@@ -827,9 +782,11 @@
                                         <td>${index + 1}</td>
                                         <td>${record.date}</td>
                                         <td>${record.clientName}</td>
-                                        <td>${record.productType}</td>
-                                        <td>${record.transactionAmount}</td>
-                                        <td>${record.expectedReturnRate}%</td>
+                                        <td>${record.loanAmount}</td>
+                                        <td>${record.interestRate}</td>
+                                        <td>${record.interestRatePeriod}</td>
+                                        <td>${record.repaymentMethod}</td>
+                                        <td>${record.loanTerm || 'N/A'}</td>
                                         <td>
                                             <span class="outcome-badge ${record.status === 'completed_success' ? 'success-badge' : (record.status === 'completed_failure' ? 'failure-badge' : '')}">
                                                 ${record.status === 'pending' ? '待定' : (record.actualOutcome === 'completed_success' ? '成功' : '失敗')}
@@ -843,22 +800,17 @@
                             </tbody>
                         </table>
                         <div style="text-align: center; margin-top: 20px; font-size: 1.1em; font-weight: bold;">
-                            篩選後總實際報酬:
+                            金流狀況:
                             <span class="${parseFloat(totalActualReturnFiltered) >= 0 ? 'blue-text' : 'red-text'}">
                                 ${totalActualReturnFiltered} NTD
                             </span>
                         </div>
                         <div style="text-align: center; margin-top: 10px; font-size: 1em;">
-                            篩選後總交易金額: ${totalTransactionValueFiltered} NTD
+                            總出款: ${totalLoanAmountFiltered} NTD
                         </div>
                         <div style="text-align: center; margin-top: 10px; font-size: 1em;">
-                            成功交易數: ${totalSuccessful} | 失敗交易數: ${totalUnsuccessful} | 平均成功率: ${averageSuccessRate}%
+                            總客戶數: ${totalCustomers}
                         </div>
-                        ${Object.keys(productTypeCounts).length > 0 ? `
-                            <div style="text-align: center; margin-top: 10px; font-size: 1em;">
-                                ${Object.entries(productTypeCounts).map(([type, count]) => `${type}: ${count} 筆`).join(' | ')}
-                            </div>
-                        ` : ''}
                         <div style="text-align: center; margin-top: 30px; font-size: 0.8em; color: #6B7280;">
                             威爾設計版權所有 ver ${currentVersion}
                         </div>
@@ -968,44 +920,7 @@
                         <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
                             <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
                                 <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">設定</h2>
-                                {/* Product Type Management */}
-                                <div className="mb-4 border-t pt-4 mt-4">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">管理產品/服務類型</h3>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {managedProductTypes.map(type => (
-                                            <span key={type} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center">
-                                                {type}
-                                                <button
-                                                    onClick={() => handleDeleteManagedProductType(type)}
-                                                    className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
-                                                >
-                                                    &times;
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex">
-                                        <input
-                                            type="text"
-                                            placeholder="新增產品/服務類型"
-                                            value={newProductTypeInput}
-                                            onChange={(e) => setNewProductTypeInput(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleAddManagedProductType();
-                                                }
-                                            }}
-                                            className="flex-grow px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                        />
-                                        <button
-                                            onClick={handleAddManagedProductType}
-                                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r-lg transition duration-200"
-                                        >
-                                            新增
-                                        </button>
-                                    </div>
-                                </div>
-                                {/* Outcome Type Management */}
+                                {/* Outcome Type Management (only custom outcomes allowed) */}
                                 <div className="mb-4 border-t pt-4 mt-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-2">管理結果類型</h3>
                                     <div className="flex flex-wrap gap-2 mb-2">
@@ -1078,82 +993,93 @@
                                 />
                             </div>
 
-                            {/* Input field for Contact Info */}
+                            {/* Input field for Loan Amount */}
                             <div className="mb-4">
-                                <label htmlFor="contactInfo" className="block text-gray-700 text-sm font-semibold mb-2">
-                                    聯絡資訊 (Email/電話):
+                                <label htmlFor="loanAmount" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    借款金額 (NTD):
                                 </label>
                                 <input
-                                    type="text"
-                                    id="contactInfo"
-                                    value={contactInfo}
-                                    onChange={(e) => setContactInfo(e.target.value)}
-                                    placeholder="例如: client@example.com 或 0912345678"
+                                    type="number"
+                                    id="loanAmount"
+                                    value={loanAmount}
+                                    onChange={(e) => setLoanAmount(e.target.value)}
+                                    placeholder="例如: 100000"
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
                                     onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
                                 />
                             </div>
 
-                            {/* Product Type Dropdown/Input */}
-                            <div className="mb-4">
-                                <label htmlFor="productType" className="block text-gray-700 text-sm font-semibold mb-2">
-                                    產品/服務類型:
-                                </label>
-                                <select
-                                    id="productType"
-                                    value={productType}
-                                    onChange={(e) => setProductType(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                >
-                                    <option value="">請選擇</option>
-                                    {managedProductTypes.map(type => (
-                                        type && <option key={type} value={type}>{type}</option>
-                                    ))}
-                                </select>
-                                {(!productType || !managedProductTypes.includes(productType)) && (
+                            {/* Input field for Interest Rate and Period */}
+                            <div className="mb-4 flex space-x-2">
+                                <div className="flex-1">
+                                    <label htmlFor="interestRate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        利率 (%):
+                                    </label>
                                     <input
-                                        type="text"
-                                        value={productType}
-                                        onChange={(e) => setProductType(e.target.value)}
-                                        placeholder="輸入新產品/服務類型"
-                                        className="w-full px-4 py-2 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        type="number"
+                                        id="interestRate"
+                                        value={interestRate}
+                                        onChange={(e) => setInterestRate(e.target.value)}
+                                        placeholder="例如: 5.0 (代表 5%)"
+                                        step="0.01"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
                                         onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
                                     />
-                                )}
+                                </div>
+                                <div>
+                                    <label htmlFor="interestRatePeriod" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        週期:
+                                    </label>
+                                    <select
+                                        id="interestRatePeriod"
+                                        value={interestRatePeriod}
+                                        onChange={(e) => setInterestRatePeriod(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    >
+                                        {managedInterestRatePeriods.map(period => (
+                                            <option key={period} value={period}>{period}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
-                            {/* Input field for Transaction Amount */}
+                            {/* Repayment Method Dropdown */}
                             <div className="mb-4">
-                                <label htmlFor="transactionAmount" className="block text-gray-700 text-sm font-semibold mb-2">
-                                    交易金額 (NTD):
+                                <label htmlFor="repaymentMethod" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    還款方式:
                                 </label>
-                                <input
-                                    type="number"
-                                    id="transactionAmount"
-                                    value={transactionAmount}
-                                    onChange={(e) => setTransactionAmount(e.target.value)}
-                                    placeholder="例如: 50000"
+                                <select
+                                    id="repaymentMethod"
+                                    value={repaymentMethod}
+                                    onChange={(e) => setRepaymentMethod(e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
-                                />
+                                >
+                                    {managedRepaymentMethods.map(method => (
+                                        <option key={method} value={method}>{method}</option>
+                                    ))}
+                                </select>
                             </div>
 
-                            {/* Input field for Expected Return Rate */}
-                            <div className="mb-4">
-                                <label htmlFor="expectedReturnRate" className="block text-gray-700 text-sm font-semibold mb-2">
-                                    預期報酬率 (%):
-                                </label>
-                                <input
-                                    type="number"
-                                    id="expectedReturnRate"
-                                    value={expectedReturnRate}
-                                    onChange={(e) => setExpectedReturnRate(e.target.value)}
-                                    placeholder="例如: 5.0 (代表 5%)"
-                                    step="0.01"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
-                                />
-                            </div>
+                            {/* Loan Term Input - conditionally displayed */}
+                            {repaymentMethod === '本+利' && (
+                                <div className="mb-4">
+                                    <label htmlFor="loanTerm" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        期數:
+                                    </label>
+                                    <input
+                                        type="number"
+                                        id="loanTerm"
+                                        value={loanTerm}
+                                        onChange={(e) => setLoanTerm(e.target.value)}
+                                        placeholder="例如: 12 (單位與利率週期一致)"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        例如：若利率為年利率，期數為年；若利率為月利率，期數為月。
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Input field for Notes */}
                             <div className="mb-4">
@@ -1202,25 +1128,20 @@
                                 )}
                             </div>
 
-                            {/* Display area for the projected return */}
+                            {/* Display area for the projected return (now for loan calculations, redefine meaning as needed) */}
                             {projectedReturn !== null && (
                                 <div className="mt-6 p-6 bg-gray-50 rounded-xl shadow-inner text-center mb-4">
-                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">單次交易預覽 (預期報酬):</h2>
+                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">借貸預覽 (年利息參考):</h2>
                                     <p className={`text-4xl font-extrabold ${parseFloat(projectedReturn) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        預期報酬: {projectedReturn} NTD
+                                        年利息: {projectedReturn} NTD
                                     </p>
-                                    {parseFloat(projectedReturn) >= 0 && (
-                                        <p className="text-sm text-gray-600 mt-2">此為若交易成功，預期之淨報酬。</p>
-                                    )}
-                                    {parseFloat(projectedReturn) < 0 && (
-                                        <p className="text-sm text-gray-600 mt-2">此為若交易成功，預期之淨虧損。</p>
-                                    )}
+                                    <p className="text-sm text-gray-600 mt-2">此為借款金額在當前年利率下，一年預期產生之利息。</p>
                                 </div>
                             )}
 
-                            {/* Section for Target Goal Calculation */}
+                            {/* Section for Target Goal Calculation (可能需要重新定義或移除) */}
                             <div className="mt-6 p-6 bg-gray-100 rounded-xl shadow-inner text-center">
-                                <h2 className="text-xl font-semibold text-gray-800 mb-4">目標報酬所需投資計算</h2>
+                                <h2 className="text-xl font-semibold text-gray-800 mb-4">達成目標報酬所需借款額</h2>
                                 <div className="mb-4">
                                     <label htmlFor="targetGoalAmount" className="block text-gray-700 text-sm font-semibold mb-2">
                                         目標報酬金額 (NTD):
@@ -1236,15 +1157,15 @@
                                 </div>
                                 {requiredInvestmentForGoal !== null && (
                                     <p className="text-lg font-bold text-gray-800 mt-4">
-                                        為達到目標報酬，需投資:
+                                        為達成目標報酬，需借款:
                                         <span className="ml-2 text-purple-600 text-3xl">
                                             {requiredInvestmentForGoal} NTD
                                         </span>
                                     </p>
                                 )}
-                                {(parseFloat(expectedReturnRate) <= 0 && targetGoalAmount !== '') && (
+                                {(parseFloat(interestRate) <= 0 && targetGoalAmount !== '') && (
                                     <p className="text-red-500 text-sm mt-2">
-                                        預期報酬率過低或為零，無法達到目標報酬，或需投資極大金額。
+                                        利率過低或為零，無法達成目標報酬，或需借款極大金額。
                                     </p>
                                 )}
                             </div>
@@ -1252,9 +1173,9 @@
 
                         {/* Display area for transaction history (right side) */}
                         <div id="transaction-history-section" className="bg-white p-8 rounded-xl shadow-2xl w-full md:w-3/5 overflow-y-auto max-h-[85vh] min-h-[200px]">
-                            <h2 className="text-xl font-extrabold text-gray-900 mb-4 text-center">客戶交易/互動紀錄</h2>
+                            <h2 className="text-xl font-extrabold text-gray-900 mb-4 text-center">客戶列表</h2>
 
-                            {/* Date and Type filter inputs and Export/Print buttons */}
+                            {/* Date filter inputs and Export/Print buttons */}
                             <div className="mb-4 flex flex-col sm:flex-row sm:space-x-4 items-end">
                                 <div className="flex-1 mb-4 sm:mb-0">
                                     <label htmlFor="startDate" className="block text-gray-700 text-sm font-semibold mb-2">
@@ -1280,40 +1201,9 @@
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
                                     />
                                 </div>
-                                {/* Product Type Filter Dropdown */}
-                                <div className="flex-1 mb-4 sm:mb-0">
-                                    <label htmlFor="productTypeFilter" className="block text-gray-700 text-sm font-semibold mb-2">
-                                        產品/服務類型篩選:
-                                    </label>
-                                    <select
-                                        id="productTypeFilter"
-                                        value={selectedProductTypeFilter}
-                                        onChange={(e) => setSelectedProductTypeFilter(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                    >
-                                        <option value="">所有類型</option>
-                                        {managedProductTypes.map(type => (
-                                            type && <option key={type} value={type}>{type}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                {/* Outcome Status Filter Dropdown */}
-                                <div className="flex-1 mb-4 sm:mb-0">
-                                    <label htmlFor="outcomeStatusFilter" className="block text-gray-700 text-sm font-semibold mb-2">
-                                        結果狀態篩選:
-                                    </label>
-                                    <select
-                                        id="outcomeStatusFilter"
-                                        value={selectedOutcomeStatusFilter}
-                                        onChange={(e) => setSelectedOutcomeStatusFilter(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                    >
-                                        <option value="">所有狀態</option>
-                                        <option value="pending">待定</option>
-                                        <option value="completed_success">成功</option>
-                                        <option value="completed_failure">失敗</option>
-                                    </select>
-                                </div>
+                                {/* Removed Interest Rate Period Filter Dropdown */}
+                                {/* Removed Repayment Method Filter Dropdown */}
+                                {/* Removed Outcome Status Filter Dropdown */}
 
                                 <button
                                     onClick={exportToCsv}
@@ -1338,9 +1228,11 @@
                                                     <th className="py-3 px-6 text-left">序號</th>
                                                     <th className="py-3 px-6 text-left">日期時間</th>
                                                     <th className="py-3 px-6 text-left">客戶名稱</th>
-                                                    <th className="py-3 px-6 text-left">產品/服務類型</th>
-                                                    <th className="py-3 px-6 text-left">交易金額</th>
-                                                    <th className="py-3 px-6 text-left">預期報酬率(%)</th>
+                                                    <th className="py-3 px-6 text-left">借款金額</th>
+                                                    <th className="py-3 px-6 text-left">利率(%)</th>
+                                                    <th className="py-3 px-6 text-left">利率週期</th>
+                                                    <th className="py-3 px-6 text-left">還款方式</th>
+                                                    <th className="py-3 px-6 text-left">期數</th>
                                                     <th className="py-3 px-6 text-left">實際結果</th>
                                                     <th className="py-3 px-6 text-left">實際報酬</th>
                                                     <th className="py-3 px-6 text-left">操作</th>
@@ -1352,9 +1244,11 @@
                                                         <td className="py-3 px-6 text-left whitespace-nowrap">{index + 1}</td>
                                                         <td className="py-3 px-6 text-left whitespace-nowrap">{record.date}</td>
                                                         <td className="py-3 px-6 text-left whitespace-nowrap">{record.clientName}</td>
-                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.productType}</td>
-                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.transactionAmount}</td>
-                                                        <td className="py-3 px-6 text-left">{record.expectedReturnRate}%</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanAmount}</td>
+                                                        <td className="py-3 px-6 text-left">{record.interestRate}</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.interestRatePeriod}</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.repaymentMethod}</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanTerm || 'N/A'}</td>
                                                         <td className="py-3 px-6 text-left">
                                                             {record.status === 'pending' ? (
                                                                 <div className="flex space-x-2">
@@ -1406,28 +1300,18 @@
                                         </table>
                                     </div>
                                     <div className="mt-4 text-center text-lg font-bold">
-                                        篩選後總實際報酬:
+                                        金流狀況:
                                         <span className={`ml-2 ${parseFloat(totalActualReturnFiltered) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                                             ${totalActualReturnFiltered} NTD
                                         </span>
                                     </div>
-                                    {/* Success/Failure Counts and Average Success Rate */}
+                                    {/* Updated statistics display */}
                                     <div className="mt-2 text-center text-base font-semibold text-gray-700">
-                                        篩選後總交易金額: <span className="text-blue-700">${totalTransactionValueFiltered} NTD</span> |
-                                        成功交易數: <span className="text-green-700">{totalSuccessful}</span> |
-                                        失敗交易數: <span className="text-red-700">{totalUnsuccessful}</span> |
-                                        平均成功率: <span className="text-blue-700">{averageSuccessRate}%</span>
+                                        總出款: <span className="text-blue-700">${totalLoanAmountFiltered} NTD</span> |
+                                        總客戶數: <span className="text-green-700">{totalCustomers}</span>
                                     </div>
-                                    {/* Product Type Counts Display */}
-                                    {Object.keys(productTypeCounts).length > 0 && (
-                                        <div className="mt-2 text-center text-base font-semibold text-gray-700">
-                                            {Object.entries(productTypeCounts).map(([type, count]) => (
-                                                <span key={type} className="mr-4">
-                                                    {type}: <span className="text-blue-700">{count} 筆</span>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
+                                    {/* Removed Interest Rate Period Counts Display */}
+                                    {/* Removed Repayment Method Counts Display */}
                                     {/* Conditional General advice for overall profit/loss */}
                                     <div className="mt-4 text-center text-sm text-gray-600 italic">
                                         {parseFloat(totalActualReturnFiltered) > 0 ? (
