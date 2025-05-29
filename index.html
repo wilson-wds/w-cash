@@ -3,559 +3,1491 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金融業客戶管理系統</title>
+    <title>金融業客戶關係管理系統 (CRM)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* 您可以將自定義的 CSS 樣式放在這裡 */
-        body { font-family: sans-serif; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* CSS for printing only the history section */
+        @media print {
+            body > *:not(#print-area) { /* Hide all direct children of body except the print area */
+                display: none !important;
+            }
+            #print-area { /* Ensure the print area is visible and takes full width */
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            /* Adjust table and text within print area for better print layout */
+            #print-area table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            #print-area th, #print-area td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            #print-area h2 {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose Firebase services to the window object for React to access
+        window.firebase = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signOut,
+            getFirestore,
+            doc,
+            getDoc,
+            addDoc,
+            setDoc,
+            updateDoc,
+            deleteDoc,
+            onSnapshot,
+            collection,
+            query,
+            where,
+            getDocs,
+            serverTimestamp // Added serverTimestamp
+        };
+    </script>
+
+    <script>
+        // ====================================================================================================
+        // *** 重要：請務必將以下 Firebase 配置替換為您自己專案的真實數值！ ***
+        // 您可以在 Firebase Console -> 專案設定 (齒輪圖示) -> 「您的應用程式」中找到它。
+        // 請確保複製的是完整的 JavaScript 物件，例如：{ apiKey: "...", authDomain: "...", ... }
+        // 注意：不要在 JSON.stringify() 內部再加額外的引號，例如 JSON.stringify("{ ... }") 是錯誤的。
+        // ====================================================================================================
+        const __firebase_config = JSON.stringify({
+          apiKey: "AIzaSyD1HulbSZpgpNFVQvmhd7GYUCUx6-7dn9s",
+          authDomain: "money-5afb9.firebaseapp.com",
+          projectId: "money-5afb9",
+          storageBucket: "money-5afb9.firebasestorage.app",
+          messagingSenderId: "136016647296",
+          appId: "1:136016647296:web:fb8be3f22148e230cec265"
+        });
+
+        // *** 重要：請自訂一個唯一的應用程式 ID，如果不在 Canvas 環境中運行 ***
+        // 這個 ID 必須與您在 Firestore 安全規則中使用的 {appId} 變數完全相符。
+        // 建議與您的 Firebase Project ID 相同，以保持一致性。
+        const __app_id = "money-5afb9"; // 使用您提供的 projectId 作為 app_id
+
+        // 這是 Canvas 環境特有的初始認證 Token。
+        // 在您本地運行或使用 GitHub Pages 時，此變數通常保持為空字串或移除。
+        // 應用程式會自動回退到匿名登入。
+        const __initial_auth_token = "";
+        // ====================================================================================================
+        // *** 上述配置替換完畢後，請儲存檔案並重新上傳到您的託管平台！ ***
+        // ====================================================================================================
+    </script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <script type="text/babel">
-        // =======================================================
-        // IMPORTANT: 已根據您提供的資訊更新 Firebase 專案配置資訊
-        // =======================================================
-         const firebaseConfig = {
-            apiKey: "AIzaSyADSbeZr04Rxr0Al5jKVY1u5j9dnD2Bfx4", // Web API 密鑰
-            authDomain: "wds-sport.firebaseapp.com", // 根據專案 ID 推斷
-            projectId: "wds-sport", // 項目 ID
-            storageBucket: "wds-sport.appspot.com", // 根據專案 ID 推斷
-            messagingSenderId: "765754214969", // 項目編號
-            appId: "1:358067975632:web:fc3bb4abc715e8476235d5" 
+        // Helper function to get today's date inYYYY-MM-DD format
+        const getTodayDateString = () => {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = (today.getMonth() + 1).toString().padStart(2, '0');
+            const day = today.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
         };
 
-        // =======================================================
-        // IMPORTANT: 已更新為您提供的 canvasAppId
-        // =======================================================
-        const canvasAppId = ""; 
+        // CRM-specific advice messages
+        const transactionSuccessAdvice = [
+            "恭喜！客戶滿意度是您最大的資產。",
+            "持續為客戶創造價值，建立長期信任關係。",
+            "您的專業和努力得到了回報，繼續保持！",
+            "謹慎管理客戶關係，讓成功持續增長。",
+            "祝您客戶源源不絕，業績長紅！",
+        ];
 
-        // =======================================================
-        // IMPORTANT: 如果您有來自 Canvas 的自定義認證令牌，請替換此處。
-        // 對於本機測試，如果您只是想匿名登入，可以保持為 null。
-        // =======================================================
-        const initialAuthToken = null; 
+        const transactionFailureAdvice = [
+            "別氣餒，每一次挫折都是學習的機會。",
+            "重新檢視客戶需求，找出可以改進的地方。",
+            "控制風險是首要任務，保護您的客戶關係。",
+            "暫時休息一下，讓思緒沉澱再出發。",
+            "分析失利原因，避免重蹈覆轍。",
+            "調整心態，堅持理性判斷。",
+        ];
 
-        // 初始化 Firebase (使用兼容版本以符合 CDN 引入)
-        const app = firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore(app); 
-        const auth = firebase.auth(app);   
+        const transactionNeutralAdvice = [
+            "客戶關係維護良好，持續觀察市場機會。",
+            "保持耐心，客戶關係的建立需要時間。",
+            "這是一個穩定的階段，可以考慮微調服務策略。",
+            "持續提供優質服務，等待更好的合作機會。",
+        ];
 
-        // =======================================================
-        // 以下是您的 React 應用程式代碼
-        // =======================================================
-
-        // Utility function to format currency
-        const formatCurrency = (amount) => {
-            return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD' }).format(amount);
-        };
-
-        // Utility function to calculate loan details
-        const calculateLoanDetails = (loanAmount, interestRate, rateUnit, repaymentMethod, periods, repaymentCycle) => {
-            let amountPerPeriod = 0;
-            let totalInterest = 0;
-            let totalRepayment = 0;
-
-            let ratePerUnit = interestRate / 100;
-            let dailyRate = 0;
-
-            switch (rateUnit) {
-                case 'year': dailyRate = ratePerUnit / 365; break;
-                case 'month': dailyRate = ratePerUnit / 30; break;
-                case 'week': dailyRate = ratePerUnit / 7; break;
-                case 'day': dailyRate = ratePerUnit; break;
-                default: dailyRate = 0;
-            }
-
-            let effectiveRatePerPeriod = 0;
-            switch (repaymentCycle) {
-                case 'month': effectiveRatePerPeriod = dailyRate * 30; break;
-                case '15day': effectiveRatePerPeriod = dailyRate * 15; break;
-                case '10day': effectiveRatePerPeriod = dailyRate * 10; break;
-                case 'week': effectiveRatePerPeriod = dailyRate * 7; break;
-                case 'day': effectiveRatePerPeriod = dailyRate; break;
-                default: effectiveRatePerPeriod = 0;
-            }
-
-            if (repaymentMethod === 'pureInterest') {
-                amountPerPeriod = loanAmount * effectiveRatePerPeriod;
-                totalInterest = 0;
-                totalRepayment = loanAmount;
-            } else {
-                let numPeriods = periods;
-                let rateForCalculation = effectiveRatePerPeriod;
-
-                if (rateForCalculation > 0 && numPeriods > 0) {
-                    amountPerPeriod = (loanAmount * rateForCalculation * Math.pow(1 + rateForCalculation, numPeriods)) / (Math.pow(1 + rateForCalculation, numPeriods) - 1);
-                    totalRepayment = amountPerPeriod * numPeriods;
-                    totalInterest = totalRepayment - loanAmount;
-                } else if (numPeriods > 0) {
-                    amountPerPeriod = loanAmount / numPeriods;
-                    totalRepayment = loanAmount;
-                    totalInterest = 0;
-                }
-            }
-            return { amountPerPeriod, totalInterest, totalRepayment };
-        };
-
-        const ConfirmationModal = ({ message, onConfirm, onCancel, show }) => {
-            if (!show) return null;
-            return (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-[100]">
-                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center">
-                        <h3 className="text-xl font-semibold text-gray-800 mb-4">確認</h3>
-                        <p className="text-gray-700 mb-6">{message}</p>
-                        <div className="flex justify-center space-x-4">
-                            <button onClick={onCancel} className="px-6 py-3 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition duration-300">取消</button>
-                            <button onClick={onConfirm} className="px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 transition duration-300">確定</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const CustomerList = ({ customers, onAddBorrower, onEditBorrower, onDeleteBorrower, userId, onGoogleSignIn, onSignOut, userName }) => {
-            console.log("CustomerList rendering. Customers data received:", customers.map(c => ({id: c.id, name: c.name, dis: c.disbursementTotal, rep: c.repaymentTotal})));
-            return (
-                <div className="p-6 bg-gray-100 min-h-screen font-inter">
-                    <div className="max-w-7xl mx-auto bg-white p-8 rounded-lg shadow-lg">
-                        <div className="flex justify-between items-center mb-6">
-                            <h1 className="text-3xl font-bold text-gray-800">客戶列表</h1>
-                            {userId ? (
-                                <div className="flex items-center space-x-4">
-                                    <span className="text-gray-700">您好, {userName || '用戶'}!</span>
-                                    <button
-                                        onClick={onSignOut}
-                                        className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition duration-300 shadow-md"
-                                    >
-                                        登出
-                                    </button>
-                                    <button onClick={onAddBorrower} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 shadow-md">新增借款人</button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={onGoogleSignIn}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 shadow-md flex items-center justify-center space-x-2"
-                                >
-                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12.24 10.21L12 10.22c-2.31 0-4.18 1.9-4.18 4.25s1.87 4.25 4.18 4.25c2.31 0 4.18-1.9 4.18-4.25s-1.87-4.25-4.18-4.25zm0-8.21c-2.31 0-4.18 1.9-4.18 4.25s1.87 4.25 4.18 4.25c2.31 0 4.18-1.9 4.18-4.25s-1.87-4.25-4.18-4.25zm0 16.42c-2.31 0-4.18 1.9-4.18 4.25s1.87 4.25 4.18 4.25c2.31 0 4.18-1.9 4.18-4.25s-1.87-4.25-4.18-4.25zM23.99 12c0-6.63-5.37-12-12-12s-12 5.37-12 12 5.37 12 12 12 12-5.37 12-12zM12 21.99c-5.52 0-9.99-4.47-9.99-9.99s4.47-9.99 9.99-9.99 9.99 4.47 9.99 9.99-4.47 9.99-9.99 9.99z"/>
-                                    </svg>
-                                    <span>使用 Google 登入</span>
-                                </button>
-                            )}
-                        </div>
-                        <div className="mb-4 text-sm text-gray-600">您的用戶 ID: <span className="font-mono bg-gray-200 px-2 py-1 rounded">{userId || '未登入'}</span></div>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">序號</th>
-                                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">姓名</th>
-                                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">借款金額</th>
-                                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">金流狀況</th>
-                                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">訂單日期</th>
-                                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {customers.length === 0 ? (
-                                        <tr><td colSpan="6" className="py-4 px-4 text-center text-gray-500">目前沒有借款人資料。</td></tr>
-                                    ) : (
-                                        customers.map((customer, index) => (
-                                            <tr key={customer.id} className="hover:bg-gray-50">
-                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{customer.name}</td>
-                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{formatCurrency(customer.loanAmount)}</td>
-                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">
-                                                    出款: {formatCurrency(customer.disbursementTotal || 0)} <br />
-                                                    還款: {formatCurrency(customer.repaymentTotal || 0)}
-                                                </td>
-                                                <td className="py-3 px-4 whitespace-nowrap text-sm text-gray-900">{customer.loanDate}</td>
-                                                <td className="py-3 px-4 whitespace-nowrap text-sm font-medium">
-                                                    <button onClick={() => onEditBorrower(customer)} className="text-blue-600 hover:text-blue-900 mr-4 transition duration-300">編輯/查看</button>
-                                                    <button onClick={() => onDeleteBorrower(customer.id)} className="text-red-600 hover:text-red-900 transition duration-300">刪除</button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const BorrowerForm = ({ customer, onSave, onCancel, onViewCashFlow }) => {
-            const [formData, setFormData] = React.useState({
-                id: customer?.id || '', name: customer?.name || '', loanDate: customer?.loanDate || new Date().toISOString().slice(0, 10),
-                loanAmount: customer?.loanAmount || 0, interestRate: customer?.interestRate || 0, rateUnit: customer?.rateUnit || 'year',
-                repaymentMethod: customer?.repaymentMethod || 'principalInterest', periods: customer?.periods || 1,
-                repaymentCycle: customer?.repaymentCycle || 'month', paymentDayOfMonth: customer?.paymentDayOfMonth || '',
-                dailyLatePenaltyPercentage: customer?.dailyLatePenaltyPercentage || 0, enableLatePenalty: customer?.enableLatePenalty || false,
-                remarks: customer?.remarks || '', disbursementTotal: customer?.disbursementTotal || 0, repaymentTotal: customer?.repaymentTotal || 0,
-            });
-
-            const [amountPerPeriod, setAmountPerPeriod] = React.useState(0);
-            const [showModal, setShowModal] = React.useState(false);
-            const [modalMessage, setModalMessage] = React.useState('');
-
-            React.useEffect(() => {
-                const { loanAmount, interestRate, rateUnit, repaymentMethod, periods, repaymentCycle } = formData;
-                if (loanAmount > 0 && interestRate >= 0) {
-                    const { amountPerPeriod } = calculateLoanDetails(parseFloat(loanAmount), parseFloat(interestRate), rateUnit, repaymentMethod, parseInt(periods), repaymentCycle);
-                    setAmountPerPeriod(amountPerPeriod);
-                } else {
-                    setAmountPerPeriod(0);
-                }
-            }, [formData]);
-
-            const handleChange = (e) => {
-                const { name, value, type, checked } = e.target;
-                setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-            };
-
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (formData.loanAmount <= 0) { setModalMessage('借款金額必須大於 0。'); setShowModal(true); return; }
-                if (formData.interestRate < 0) { setModalMessage('利率不能為負數。'); setShowModal(true); return; }
-                if (formData.repaymentMethod !== 'pureInterest' && formData.periods <= 0) { setModalMessage('期數必須大於 0。'); setShowModal(true); return; }
-                onSave({ ...formData, loanAmount: parseFloat(formData.loanAmount), interestRate: parseFloat(formData.interestRate), periods: parseInt(formData.periods), dailyLatePenaltyPercentage: parseFloat(formData.dailyLatePenaltyPercentage), amountPerPeriod: amountPerPeriod, });
-            };
-
-            const closeModal = () => { setShowModal(false); setModalMessage(''); };
-
-            return (
-                <div className="p-6 bg-gray-100 min-h-screen font-inter">
-                    <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-lg">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-6">{customer ? '編輯借款人' : '新增借款人'}</h1>
-                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">姓名</label><input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"/></div>
-                            <div><label htmlFor="loanDate" className="block text-sm font-medium text-gray-700 mb-1">借款日期</label><input type="date" id="loanDate" name="loanDate" value={formData.loanDate} onChange={handleChange} required className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"/></div>
-                            <div><label htmlFor="loanAmount" className="block text-sm font-medium text-gray-700 mb-1">借款金額</label><input type="number" id="loanAmount" name="loanAmount" value={formData.loanAmount} onChange={handleChange} required min="0" step="0.01" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"/></div>
-                            <div className="flex items-end"><div className="flex-grow"><label htmlFor="interestRate" className="block text-sm font-medium text-gray-700 mb-1">利率 (%)</label><input type="number" id="interestRate" name="interestRate" value={formData.interestRate} onChange={handleChange} required min="0" step="0.01" className="w-full px-4 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"/></div><select id="rateUnit" name="rateUnit" value={formData.rateUnit} onChange={handleChange} className="px-4 py-2 border border-gray-300 rounded-r-md bg-gray-50 focus:ring-blue-500 focus:border-blue-500"><option value="year">年</option><option value="month">月</option><option value="week">週</option><option value="day">日</option></select></div>
-                            <div><label htmlFor="repaymentMethod" className="block text-sm font-medium text-gray-700 mb-1">還款方式</label><select id="repaymentMethod" name="repaymentMethod" value={formData.repaymentMethod} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50 focus:ring-blue-500 focus:border-blue-500"><option value="principalInterest">本金+利息</option><option value="pureInterest">純繳利息</option></select></div>
-                            <div><label htmlFor="periods" className="block text-sm font-medium text-gray-700 mb-1">期數</label><input type="number" id="periods" name="periods" value={formData.repaymentMethod === 'pureInterest' ? '' : formData.periods} onChange={handleChange} disabled={formData.repaymentMethod === 'pureInterest'} required={formData.repaymentMethod !== 'pureInterest'} min="1" step="1" className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 ${formData.repaymentMethod === 'pureInterest' ? 'bg-gray-200 cursor-not-allowed' : ''}`}/></div>
-                            <div><label htmlFor="repaymentCycle" className="block text-sm font-medium text-gray-700 mb-1">還款週期</label><select id="repaymentCycle" name="repaymentCycle" value={formData.repaymentCycle} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50 focus:ring-blue-500 focus:border-blue-500"><option value="month">月</option><option value="15day">15日</option><option value="10day">10日</option><option value="week">週</option><option value="day">日</option></select></div>
-                            <div><label htmlFor="paymentDayOfMonth" className="block text-sm font-medium text-gray-700 mb-1">每月幾號繳款 (非必填)</label><input type="number" id="paymentDayOfMonth" name="paymentDayOfMonth" value={formData.paymentDayOfMonth} onChange={handleChange} min="1" max="31" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"/></div>
-                            <div className="col-span-1 md:col-span-2"><label htmlFor="dailyLatePenaltyPercentage" className="block text-sm font-medium text-gray-700 mb-1">每日遲繳罰款總借款的 % 數</label><div className="flex items-center"><input type="number" id="dailyLatePenaltyPercentage" name="dailyLatePenaltyPercentage" value={formData.dailyLatePenaltyPercentage} onChange={handleChange} min="0" step="0.01" disabled={!formData.enableLatePenalty} className={`flex-grow px-4 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500 ${!formData.enableLatePenalty ? 'bg-gray-200 cursor-not-allowed' : ''}`}/><span className="px-3 py-2 border-y border-r border-gray-300 bg-gray-50 text-gray-700">%</span><div className="ml-4 flex items-center"><input type="checkbox" id="enableLatePenalty" name="enableLatePenalty" checked={formData.enableLatePenalty} onChange={handleChange} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/><label htmlFor="enableLatePenalty" className="ml-2 text-sm font-medium text-gray-700">啟用此選項</label></div></div></div>
-                            <div className="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded-md border border-blue-200"><h3 className="text-lg font-semibold text-blue-800 mb-2">計算結果</h3><p className="text-gray-700 mb-1">每期應繳金額: <span className="font-bold text-blue-600">{formatCurrency(amountPerPeriod)}</span></p></div>
-                            <div className="col-span-1 md:col-span-2"><label htmlFor="remarks" className="block text-sm font-medium text-gray-700 mb-1">備註</label><textarea id="remarks" name="remarks" value={formData.remarks} onChange={handleChange} rows="3" className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea></div>
-                            <div className="col-span-1 md:col-span-2 flex justify-end space-x-4 mt-6">{customer && (<button type="button" onClick={() => onViewCashFlow(customer)} className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition duration-300 shadow-md">查看金流收支</button>)}<button type="button" onClick={onCancel} className="px-6 py-3 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition duration-300 shadow-md">取消</button><button type="submit" className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 shadow-md">儲存</button></div>
-                        </form>
-                        {showModal && (<div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center"><h3 className="text-xl font-semibold text-gray-800 mb-4">提示</h3><p className="text-gray-700 mb-6">{modalMessage}</p><button onClick={closeModal} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300">確定</button></div></div>)}
-                    </div>
-                </div>
-            );
-        };
-
-        const CashFlowModal = ({ customer, onClose, userId, appId, db }) => {
-            const [cashFlows, setCashFlows] = React.useState([]);
-            const [newEntry, setNewEntry] = React.useState({ type: '還款', date: new Date().toISOString().slice(0, 10), amount: '', category: '本金還款', remarks: '', });
-            const [modalMessage, setModalMessage] = React.useState('');
-            const [showInnerModal, setShowInnerModal] = React.useState(false);
-            const [showDeleteCashFlowConfirm, setShowDeleteCashFlowConfirm] = React.useState(false);
-            const [cashFlowEntryToDelete, setCashFlowEntryToDelete] = React.useState(null);
-
-            React.useEffect(() => {
-                if (!customer || !userId || typeof customer.id !== 'string' || customer.id.trim() === '') {
-                    console.error("CashFlowModal useEffect: customer, userId, or customer.id is missing/invalid or empty string. Cannot fetch cash flows. Customer:", customer, "UserID:", userId);
-                    return;
-                }
-                const cashFlowsCollectionRef = firebase.firestore().collection(`artifacts/${appId}/users/${userId}/customers/${customer.id}/cashFlows`);
-                const unsubscribe = cashFlowsCollectionRef.onSnapshot((snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    const sortedData = data.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    setCashFlows(sortedData);
-                }, (error) => {
-                    console.error("Error fetching cash flows:", error);
-                });
-                return () => unsubscribe();
-            }, [customer, userId, appId, db]);
-
-            const handleNewEntryChange = (e) => {
-                const { name, value } = e.target;
-                setNewEntry(prev => ({ ...prev, [name]: value }));
-            };
-
-            const handleAddCashFlow = async (e) => {
-                e.preventDefault();
-                if (!newEntry.amount || parseFloat(newEntry.amount) <= 0) { setModalMessage('金額必須大於 0。'); setShowInnerModal(true); return; }
-                if (!customer || !customer.id || typeof customer.id !== 'string' || customer.id.trim() === '') { setModalMessage('無法新增金流：客戶資料不完整 (缺少客戶ID)。'); setShowInnerModal(true); console.error("Attempted to add cash flow for a customer with missing or invalid ID. Customer object at error:", customer); return; }
-
-                try {
-                    const cashFlowsCollectionRef = firebase.firestore().collection(`artifacts/${appId}/users/${userId}/customers/${customer.id}/cashFlows`);
-                    await cashFlowsCollectionRef.doc().set({ ...newEntry, amount: parseFloat(newEntry.amount), date: newEntry.date || new Date().toISOString().slice(0, 10), });
-
-                    const customerDocRef = firebase.firestore().doc(`artifacts/${appId}/users/${userId}/customers/${customer.id}`);
-                    const customerSnapshot = await customerDocRef.get();
-                    let currentDisbursement = customerSnapshot.exists ? (customerSnapshot.data().disbursementTotal || 0) : 0;
-                    let currentRepayment = customerSnapshot.exists ? (customerSnapshot.data().repaymentTotal || 0) : 0;
-
-                    if (newEntry.type === '出款') { currentDisbursement += parseFloat(newEntry.amount); }
-                    else if (newEntry.type === '還款') { currentRepayment += parseFloat(newEntry.amount); }
-                    await customerDocRef.set({ disbursementTotal: currentDisbursement, repaymentTotal: currentRepayment, }, { merge: true });
-
-                    console.log(`CashFlowModal: Updated customer ${customer.id} totals in Firestore: Disbursement=${currentDisbursement}, Repayment=${currentRepayment}`);
-                    setNewEntry({ type: '還款', date: new Date().toISOString().slice(0, 10), amount: '', category: '本金還款', remarks: '', });
-                } catch (error) {
-                    console.error("Error adding cash flow:", error);
-                    let errorMessage = '新增金流失敗。';
-                    if (error.code) { errorMessage += ` 錯誤碼: ${error.code}.`; }
-                    if (error.message) { errorMessage += ` 詳情: ${error.message}`; }
-                    setModalMessage(errorMessage); setShowInnerModal(true);
-                }
-            };
-
-            const handleDeleteCashFlow = (entry) => { setCashFlowEntryToDelete(entry); setShowDeleteCashFlowConfirm(true); };
-
-            const confirmDeleteCashFlow = async () => {
-                if (!cashFlowEntryToDelete) return;
-                try {
-                    await firebase.firestore().doc(`artifacts/${appId}/users/${userId}/customers/${customer.id}/cashFlows/${cashFlowEntryToDelete.id}`).delete();
-
-                    const customerDocRef = firebase.firestore().doc(`artifacts/${appId}/users/${userId}/customers/${customer.id}`);
-                    const customerSnapshot = await customerDocRef.get();
-                    let currentDisbursement = customerSnapshot.exists ? (customerSnapshot.data().disbursementTotal || 0) : 0;
-                    let currentRepayment = customerSnapshot.exists ? (customerSnapshot.data().repaymentTotal || 0) : 0;
-
-                    if (cashFlowEntryToDelete.type === '出款') { currentDisbursement -= cashFlowEntryToDelete.amount; }
-                    else if (cashFlowEntryToDelete.type === '還款') { currentRepayment -= cashFlowEntryToDelete.amount; }
-                    await customerDocRef.set({ disbursementTotal: currentDisbursement, repaymentTotal: currentRepayment, }, { merge: true });
-                    console.log(`CashFlowModal: Updated customer ${customer.id} totals in Firestore after delete: Disbursement=${currentDisbursement}, Repayment=${currentRepayment}`);
-                } catch (error) {
-                    console.error("Error deleting cash flow:", error);
-                    let errorMessage = '刪除金流失敗。';
-                    if (error.code) { errorMessage += ` 錯誤碼: ${error.code}.`; }
-                    if (error.message) { errorMessage += ` 詳情: ${error.message}`; }
-                    setModalMessage(errorMessage); setShowInnerModal(true);
-                } finally { setShowDeleteCashFlowConfirm(false); setCashFlowEntryToDelete(null); }
-            };
-
-            const cancelDeleteCashFlow = () => { setShowDeleteCashFlowConfirm(false); setCashFlowEntryToDelete(null); };
-            const closeInnerModal = () => { setShowInnerModal(false); setModalMessage(''); };
-
-            const totalDisbursementRaw = cashFlows.filter(cf => cf.type === '出款').reduce((sum, cf) => sum + cf.amount, 0);
-            const totalRepaymentRaw = cashFlows.filter(cf => cf.type === '還款').reduce((sum, cf) => sum + cf.amount, 0);
-            const displayedDisbursement = totalDisbursementRaw * -1;
-            const subtotal = totalRepaymentRaw + displayedDisbursement;
-
-            return (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                            <h2 className="text-2xl font-bold text-gray-800">金流收支 - {customer?.name}</h2>
-                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl font-semibold">&times;</button>
-                        </div>
-                        <div className="p-6">
-                            <h3 className="text-xl font-semibold text-gray-800 mb-4">金流記錄</h3>
-                            {cashFlows.length === 0 ? (<p className="text-gray-500 text-center mb-8">目前沒有金流記錄。</p>) : (
-                                <div className="overflow-x-auto mb-8">
-                                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                                        <thead className="bg-gray-50">
-                                            <tr><th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">類型</th><th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">日期</th><th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">金額</th><th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">名目</th><th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">備註</th><th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">操作</th></tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-200">
-                                            {cashFlows.map((entry) => (
-                                                <tr key={entry.id} className="hover:bg-gray-50">
-                                                    <td className="py-2 px-3 whitespace-nowrap text-sm text-gray-900">{entry.type}</td>
-                                                    <td className="py-2 px-3 whitespace-nowrap text-sm text-gray-900">{entry.date}</td>
-                                                    <td className="py-2 px-3 whitespace-nowrap text-sm text-gray-900">{formatCurrency(entry.amount)}</td>
-                                                    <td className="py-2 px-3 whitespace-nowrap text-sm text-gray-900">{entry.category}</td>
-                                                    <td className="py-2 px-3 text-sm text-gray-900 max-w-xs overflow-hidden text-ellipsis">{entry.remarks}</td>
-                                                    <td className="py-2 px-3 whitespace-nowrap text-sm font-medium"><button onClick={() => handleDeleteCashFlow(entry)} className="text-red-600 hover:text-red-900 transition duration-300">刪除</button></td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                            <h3 className="text-xl font-semibold text-gray-800 mb-4">金流總覽</h3>
-                            <div className="flex justify-around mb-6 text-lg font-medium">
-                                <p className="text-green-600">總出款: {formatCurrency(displayedDisbursement)}</p>
-                                <p className="text-red-600">總還款: {formatCurrency(totalRepaymentRaw)}</p>
-                                <p className="text-blue-600">小計: {formatCurrency(subtotal)}</p>
-                            </div>
-                            <h3 className="text-xl font-semibold text-gray-800 mb-4">新增金流</h3>
-                            <form onSubmit={handleAddCashFlow} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-4 border border-gray-200 rounded-md bg-gray-50">
-                                <div><label htmlFor="cashFlowType" className="block text-sm font-medium text-gray-700 mb-1">類型</label><select id="cashFlowType" name="type" value={newEntry.type} onChange={handleNewEntryChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"><option value="還款">還款</option><option value="出款">出款</option></select></div>
-                                <div><label htmlFor="cashFlowDate" className="block text-sm font-medium text-gray-700 mb-1">日期</label><input type="date" id="cashFlowDate" name="date" value={newEntry.date} onChange={handleNewEntryChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"/></div>
-                                <div><label htmlFor="cashFlowAmount" className="block text-sm font-medium text-gray-700 mb-1">金額</label><input type="number" id="cashFlowAmount" name="amount" value={newEntry.amount} onChange={handleNewEntryChange} required min="0" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"/></div>
-                                <div><label htmlFor="cashFlowCategory" className="block text-sm font-medium text-gray-700 mb-1">名目</label><select id="cashFlowCategory" name="category" value={newEntry.category} onChange={handleNewEntryChange} className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 focus:ring-blue-500 focus:border-blue-500"><option value="本金出款">本金出款</option><option value="本金還款">本金還款</option><option value="利息">利息</option><option value="罰金">罰金</option><option value="其他">其他</option></select></div>
-                                <div className="col-span-full"><label htmlFor="cashFlowRemarks" className="block text-sm font-medium text-gray-700 mb-1">備註</label><textarea id="cashFlowRemarks" name="remarks" value={newEntry.remarks} onChange={handleChange} rows="2" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea></div>
-                                <div className="col-span-full flex justify-end"><button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 shadow-md">新增金流</button></div>
-                            </form>
-                        </div>
-                        {showInnerModal && (<div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center"><h3 className="text-xl font-semibold text-gray-800 mb-4">提示</h3><p className="text-gray-700 mb-6">{modalMessage}</p><button onClick={closeInnerModal} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300">確定</button></div></div>)}
-                        <ConfirmationModal show={showDeleteCashFlowConfirm} message={`您確定要刪除這筆金流記錄嗎？ (金額: ${formatCurrency(cashFlowEntryToDelete?.amount || 0)})`} onConfirm={confirmDeleteCashFlow} onCancel={cancelDeleteCashFlow}/>
-                    </div>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const [customers, setCustomers] = React.useState([]);
-            const [currentPage, setCurrentPage] = React.useState('list');
-            const [editingCustomer, setEditingCustomer] = React.useState(null);
-            const [currentUserId, setCurrentUserId] = React.useState(null);
+        function FinancialCRM() {
+            const [db, setDb] = React.useState(null);
+            const [auth, setAuth] = React.useState(null);
+            const [userId, setUserId] = React.useState(null);
+            const [userName, setUserName] = React.useState(null);
+            const [userEmail, setUserEmail] = React.useState(null);
             const [isAuthReady, setIsAuthReady] = React.useState(false);
-            const [showCashFlowModal, setShowCashFlowModal] = React.useState(false);
-            const [selectedCustomerForCashFlow, setSelectedCustomerForCashFlow] = React.useState(null);
-            const [showDeleteConfirmModal, setShowDeleteConfirmModal] = React.useState(false);
-            const [itemToDelete, setItemToDelete] = React.useState(null);
-            const [userName, setUserName] = React.useState(''); // State to store user's display name
+            const [loadingFirebase, setLoadingFirebase] = React.useState(true);
 
+            // Client and Transaction input states
+            const [clientName, setClientName] = React.useState('');
+            const [contactInfo, setContactInfo] = React.useState('');
+            const [productType, setProductType] = React.useState('');
+            const [transactionAmount, setTransactionAmount] = React.useState('');
+            const [expectedReturnRate, setExpectedReturnRate] = React.useState(''); // New: percentage
+            const [notes, setNotes] = React.useState('');
+            const [projectedReturn, setProjectedReturn] = React.useState(null);
+            const [errorMessage, setErrorMessage] = React.useState('');
+            const [transactionsHistory, setTransactionsHistory] = React.useState([]);
+
+            // Filter states
+            const [startDate, setStartDate] = React.useState(getTodayDateString());
+            const [endDate, setEndDate] = React.useState(getTodayDateString());
+            const [selectedProductTypeFilter, setSelectedProductTypeFilter] = React.useState('');
+            const [selectedOutcomeStatusFilter, setSelectedOutcomeStatusFilter] = React.useState(''); // New filter for transaction status
+
+            // Target Goal Calculation states
+            const [targetGoalAmount, setTargetGoalAmount] = React.useState('');
+            const [requiredInvestmentForGoal, setRequiredInvestmentForGoal] = React.useState(null);
+
+            // Modals and editing states
+            const [showConfirmDeleteDialog, setShowConfirmDeleteDialog] = React.useState(false);
+            const [recordToDelete, setRecordToDelete] = React.useState(null);
+            const [editingRecordId, setEditingRecordId] = React.useState(null);
+
+            // Version history data
+            const versionHistoryData = [
+                {
+                    version: "1.3",
+                    date: "2025-05-29",
+                    content: "解決 Firebase 匿名認證失敗問題：提醒用戶在 Firebase Console 中啟用匿名認證。版本號更新。",
+                },
+                {
+                    version: "1.2",
+                    date: "2025-05-29",
+                    content: "更新 Firebase 配置資訊，確保應用程式能正確連接到您的 Firebase 專案。",
+                },
+                {
+                    version: "1.1",
+                    date: "2025-05-29",
+                    content: "修正預覽無法正常顯示問題：確保 Firebase 配置變數正確傳遞並初始化。更新版本號。",
+                },
+                {
+                    version: "1.0",
+                    date: "2025-05-29",
+                    content: "初始版本：基於運彩模板改編為金融業CRM。新增客戶管理、交易紀錄、產品類型管理、互動結果追蹤及相關統計。",
+                },
+            ];
+            const [currentVersion, setCurrentVersion] = React.useState(versionHistoryData[0].version);
+            const [showUpdateLogModal, setShowUpdateLogModal] = React.useState(false);
+            const [showSettingsModal, setShowSettingsModal] = React.useState(false);
+
+            // States for managing unique product types and outcome types in settings
+            const [managedProductTypes, setManagedProductTypes] = React.useState([]);
+            const [managedOutcomeTypes, setManagedOutcomeTypes] = React.useState([]);
+            const [newProductTypeInput, setNewProductTypeInput] = React.useState('');
+            const [newOutcomeTypeInput, setNewOutcomeTypeInput] = React.useState('');
+
+            // --- Firebase Initialization and Authentication ---
             React.useEffect(() => {
-                const unsubscribeAuth = firebase.auth().onAuthStateChanged(async (user) => {
-                    if (user) {
-                        // User is signed in.
-                        setCurrentUserId(user.uid);
-                        setUserName(user.displayName || user.email || '用戶'); // Set display name
-                        setIsAuthReady(true);
-                    } else {
-                        // No user is signed in. Attempt anonymous sign-in or wait for Google sign-in.
-                        try {
-                            if (initialAuthToken) {
-                                await firebase.auth().signInWithCustomToken(initialAuthToken);
+                const initializeFirebase = async () => {
+                    try {
+                        // Access global variables defined in the HTML script tags
+                        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+                        const app = window.firebase.initializeApp(firebaseConfig);
+                        const authInstance = window.firebase.getAuth(app);
+                        const dbInstance = window.firebase.getFirestore(app);
+
+                        setAuth(authInstance);
+                        setDb(dbInstance);
+
+                        // Log config for debugging
+                        console.log("Firebase Config:", firebaseConfig);
+
+                        const unsubscribe = window.firebase.onAuthStateChanged(authInstance, async (user) => {
+                            if (user) {
+                                setUserId(user.uid);
+                                setUserName(user.displayName || user.email || '匿名用戶');
+                                setUserEmail(user.email);
+                                console.log("User signed in:", user.uid); // Log user ID
                             } else {
-                                // Only sign in anonymously if there's no initialAuthToken and no user
-                                // This prevents automatic anonymous sign-in if user intends to use Google sign-in
-                                // and hasn't clicked the button yet.
-                                // For this example, we'll let the Google button handle explicit sign-in.
-                                // If you want anonymous fallback, uncomment the line below:
-                                // await firebase.auth().signInAnonymously();
-                            }
-                        } catch (error) {
-                            console.error("Firebase authentication failed:", error);
-                        }
-                        setCurrentUserId(null); // Ensure userId is null if not authenticated
-                        setUserName('');
-                        setIsAuthReady(true);
-                    }
-                });
-                return () => unsubscribeAuth();
-            }, []);
-
-            React.useEffect(() => {
-                if (isAuthReady && currentUserId) {
-                    const customersCollectionRef = firebase.firestore().collection(`artifacts/${canvasAppId}/users/${currentUserId}/customers`);
-                    const unsubscribe = customersCollectionRef.onSnapshot((snapshot) => {
-                        const customerData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setCustomers(customerData);
-
-                        if (editingCustomer && editingCustomer.id) {
-                            const updatedEditingCustomer = customerData.find(c => c.id === editingCustomer.id);
-                            if (updatedEditingCustomer) {
-                                if (JSON.stringify(editingCustomer) !== JSON.stringify(updatedEditingCustomer)) {
-                                    setEditingCustomer(updatedEditingCustomer);
-                                    console.log("App: editingCustomer updated with latest data from Firestore.");
+                                try {
+                                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== '') {
+                                        await window.firebase.signInWithCustomToken(authInstance, __initial_auth_token);
+                                        console.log("Signed in with custom token.");
+                                    } else {
+                                        await window.firebase.signInAnonymously(authInstance);
+                                        console.log("Signed in anonymously.");
+                                    }
+                                } catch (anonError) {
+                                    console.error("Anonymous sign-in failed:", anonError);
+                                    setErrorMessage("匿名登入失敗，請檢查 Firebase 認證設定或 API 金鑰。");
                                 }
                             }
-                        }
-                        console.log("App's onSnapshot updated customers state. New customer data:", customerData.map(c => ({id: c.id, name: c.name, dis: c.disbursementTotal, rep: c.repaymentTotal})));
-                    }, (error) => { console.error("Error fetching customers:", error); });
-                    return () => unsubscribe();
-                } else if (isAuthReady && !currentUserId) {
-                    // Clear customers if user logs out or is not authenticated
-                    setCustomers([]);
-                    setEditingCustomer(null);
-                }
-            }, [isAuthReady, currentUserId, editingCustomer]);
+                            setIsAuthReady(true);
+                            setLoadingFirebase(false);
+                        });
+
+                        return () => unsubscribe();
+                    } catch (error) {
+                        console.error("Firebase initialization failed:", error);
+                        setErrorMessage("Firebase 初始化失敗，請檢查設定。");
+                        setLoadingFirebase(false);
+                    }
+                };
+
+                initializeFirebase();
+            }, []);
+
+            // --- Load managed product types and outcome types from Firestore ---
+            React.useEffect(() => {
+                if (!db || !isAuthReady || !userId) return;
+
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const productTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
+                const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
+
+                const unsubscribeProductTypes = window.firebase.onSnapshot(productTypesRef, (snapshot) => {
+                    const types = snapshot.docs.map(doc => doc.id);
+                    setManagedProductTypes(types.sort());
+                }, (error) => {
+                    console.error("Error fetching product types:", error);
+                });
+
+                const unsubscribeOutcomeTypes = window.firebase.onSnapshot(outcomeTypesRef, (snapshot) => {
+                    const types = snapshot.docs.map(doc => doc.id);
+                    setManagedOutcomeTypes(types.sort());
+                }, (error) => {
+                    console.error("Error fetching outcome types:", error);
+                });
+
+                return () => {
+                    unsubscribeProductTypes();
+                    unsubscribeOutcomeTypes();
+                };
+            }, [db, isAuthReady, userId]);
 
             const handleGoogleSignIn = async () => {
-                const provider = new firebase.auth.GoogleAuthProvider();
+                setErrorMessage('');
+                if (!auth) {
+                    setErrorMessage("認證服務未準備好。");
+                    return;
+                }
                 try {
-                    await firebase.auth().signInWithPopup(provider);
-                    // onAuthStateChanged will handle updating the user state
+                    const provider = new window.firebase.GoogleAuthProvider();
+                    await window.firebase.signInWithPopup(auth, provider);
                 } catch (error) {
                     console.error("Google Sign-In failed:", error);
-                    alert(`Google 登入失敗: ${error.message}`); // Use alert for simplicity in HTML version
+                    let msg = "Google 登入失敗。";
+                    if (error.code === 'auth/popup-closed-by-user') {
+                        msg = "Google 登入視窗已關閉。";
+                    } else if (error.code === 'auth/cancelled-popup-request') {
+                        msg = "已取消先前的登入請求。";
+                    } else if (error.code === 'auth/unauthorized-domain') {
+                        msg = "未授權的網域。請在 Firebase Console 中新增您的網域。";
+                    }
+                    setErrorMessage(msg + " 請檢查 Firebase 認證設定。");
                 }
             };
 
             const handleSignOut = async () => {
+                setErrorMessage('');
+                if (!auth) {
+                    setErrorMessage("認證服務未準備好。");
+                    return;
+                }
                 try {
-                    await firebase.auth().signOut();
-                    // onAuthStateChanged will handle updating the user state
+                    await window.firebase.signOut(auth);
+                    setUserId(null);
+                    setUserName(null);
+                    setUserEmail(null);
+                    setTransactionsHistory([]);
                 } catch (error) {
                     console.error("Sign Out failed:", error);
-                    alert(`登出失敗: ${error.message}`); // Use alert for simplicity in HTML version
+                    setErrorMessage("登出失敗。");
                 }
             };
 
-            const handleAddBorrower = () => { setCurrentPage('form'); setEditingCustomer(null); };
-            const handleEditBorrower = (customer) => { setCurrentPage('form'); setEditingCustomer(customer); };
-            const handleSaveBorrower = async (borrowerData) => {
-                if (!currentUserId) { console.error("User ID not available. Cannot save data."); alert("請先登入才能儲存資料。"); return; }
+            // --- Load transactions history from Firestore ---
+            React.useEffect(() => {
+                if (!db || !isAuthReady || !userId) {
+                    if (transactionsHistory.length > 0) {
+                        setTransactionsHistory([]);
+                    }
+                    return;
+                }
+
+                let unsubscribe;
                 try {
-                    let customerDocRef; let newCustomerId = borrowerData.id;
-                    if (borrowerData.id) { customerDocRef = firebase.firestore().doc(`artifacts/${canvasAppId}/users/${currentUserId}/customers/${borrowerData.id}`); }
-                    else { customerDocRef = firebase.firestore().collection(`artifacts/${canvasAppId}/users/${currentUserId}/customers`).doc(); newCustomerId = customerDocRef.id; }
-                    await customerDocRef.set({ ...borrowerData, id: newCustomerId }, { merge: true });
-                    setCurrentPage('list'); console.log("App: handleSaveBorrower completed. Data saved to Firestore.");
-                } catch (error) { console.error("Error saving borrower:", error); alert(`儲存失敗: ${error.message}`); }
-            };
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const transactionsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions`);
 
-            const handleDeleteBorrower = (id) => {
-                const customerToDelete = customers.find(c => c.id === id);
-                if (customerToDelete) { setItemToDelete({ type: 'borrower', id: id, name: customerToDelete.name }); setShowDeleteConfirmModal(true); }
-            };
-            const confirmDeleteAction = async () => {
-                if (!currentUserId || !itemToDelete) { console.error("User ID or item to delete not available."); alert("請先登入才能刪除資料。"); return; }
+                    unsubscribe = window.firebase.onSnapshot(transactionsCollectionRef, (snapshot) => {
+                        const records = [];
+                        snapshot.forEach(doc => {
+                            records.push({ id: doc.id, ...doc.data() });
+                        });
+                        records.sort((a, b) => {
+                            const timeA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate().getTime() : a.timestamp) : a.id;
+                            const timeB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate().getTime() : b.timestamp) : b.id;
+                            return timeB - timeA; // Newest first
+                        });
+                        setTransactionsHistory(records);
+                    }, (error) => {
+                        console.error("Error fetching real-time data:", error);
+                        setErrorMessage("無法載入即時交易紀錄。");
+                    });
+
+                } catch (error) {
+                    console.error("Failed to set up Firestore listener:", error);
+                    setErrorMessage("設定資料庫監聽失敗。");
+                }
+
+                return () => {
+                    if (unsubscribe) unsubscribe();
+                };
+            }, [db, isAuthReady, userId]);
+
+            // Calculate projected return and required investment
+            const calculateInstantResults = React.useCallback(() => {
+                const parsedTransactionAmount = parseFloat(transactionAmount);
+                const parsedExpectedReturnRate = parseFloat(expectedReturnRate); // As a percentage
+
+                if (isNaN(parsedTransactionAmount) || parsedTransactionAmount <= 0 || isNaN(parsedExpectedReturnRate)) {
+                    setProjectedReturn(null);
+                } else {
+                    const projected = parsedTransactionAmount * (parsedExpectedReturnRate / 100);
+                    setProjectedReturn(projected.toFixed(2));
+                }
+
+                if (isNaN(targetGoalAmount) || parseFloat(targetGoalAmount) <= 0 || isNaN(parsedExpectedReturnRate) || parsedExpectedReturnRate <= 0) {
+                    setRequiredInvestmentForGoal(null);
+                } else {
+                    const required = parseFloat(targetGoalAmount) / (parsedExpectedReturnRate / 100);
+                    setRequiredInvestmentForGoal(required.toFixed(2));
+                }
+            }, [transactionAmount, expectedReturnRate, targetGoalAmount]);
+
+            React.useEffect(() => {
+                calculateInstantResults();
+            }, [transactionAmount, expectedReturnRate, targetGoalAmount, calculateInstantResults]);
+
+            const handleSaveRecordButtonClick = async () => {
+                setErrorMessage('');
+                if (!db || !userId) {
+                    setErrorMessage("資料庫未準備好或未登入。請先登入。");
+                    return;
+                }
+
+                const parsedTransactionAmount = parseFloat(transactionAmount);
+                const parsedExpectedReturnRate = parseFloat(expectedReturnRate);
+
+                if (clientName.trim() === '') {
+                    setErrorMessage('請輸入客戶名稱。');
+                    return;
+                }
+                if (isNaN(parsedTransactionAmount) || parsedTransactionAmount <= 0) {
+                    setErrorMessage('請輸入有效的交易金額 (必須是正數)。');
+                    return;
+                }
+                if (isNaN(parsedExpectedReturnRate)) {
+                    setErrorMessage('請輸入有效的預期報酬率。');
+                    return;
+                }
+                if (productType.trim() === '') {
+                    setErrorMessage('請選擇或輸入產品/服務類型。');
+                    return;
+                }
+
+                const now = new Date();
+                const localDateTimeString = now.toLocaleString('zh-TW', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }).replace(/\//g, '-');
+
                 try {
-                    if (itemToDelete.type === 'borrower') { await firebase.firestore().doc(`artifacts/${canvasAppId}/users/${currentUserId}/customers/${itemToDelete.id}`).delete(); console.log("App: Borrower deleted from Firestore:", itemToDelete.id); }
-                } catch (error) { console.error("Error during deletion:", error); alert(`刪除失敗: ${error.message}`); }
-                finally { setShowDeleteConfirmModal(false); setItemToDelete(null); }
-            };
-            const cancelDeleteAction = () => { setShowDeleteConfirmModal(false); setItemToDelete(null); };
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const transactionsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions`);
 
-            const handleCancel = () => { setCurrentPage('list'); setEditingCustomer(null); };
-            const handleViewCashFlow = (customer) => {
-                if (!currentUserId) { alert("請先登入才能查看金流。"); return; }
-                setSelectedCustomerForCashFlow(customer); setShowCashFlowModal(true); console.log("App: Opening CashFlowModal for customer:", customer.id, "Current totals:", customer.disbursementTotal, customer.repaymentTotal);
-            };
-            const handleCloseCashFlowModal = () => { setShowCashFlowModal(false); setSelectedCustomerForCashFlow(null); console.log("App: Closing CashFlowModal."); };
+                    if (editingRecordId) {
+                        const docRef = window.firebase.doc(transactionsCollectionRef, editingRecordId);
+                        await window.firebase.updateDoc(docRef, {
+                            clientName: clientName.trim(),
+                            contactInfo: contactInfo.trim(),
+                            productType: productType.trim(),
+                            transactionAmount: parsedTransactionAmount,
+                            expectedReturnRate: parsedExpectedReturnRate,
+                            notes: notes.trim(),
+                        });
+                        setErrorMessage("紀錄已成功更新。");
+                        setEditingRecordId(null);
+                    } else {
+                        await window.firebase.addDoc(transactionsCollectionRef, {
+                            clientName: clientName.trim(),
+                            contactInfo: contactInfo.trim(),
+                            productType: productType.trim(),
+                            transactionAmount: parsedTransactionAmount,
+                            expectedReturnRate: parsedExpectedReturnRate,
+                            notes: notes.trim(),
+                            actualOutcome: null, // e.g., 'successful', 'unsuccessful', 'pending'
+                            outcomeNotes: '',
+                            date: localDateTimeString,
+                            status: 'pending', // 'pending', 'completed_success', 'completed_failure'
+                            timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
+                            addedBy: userId,
+                        });
+                        setErrorMessage("新增紀錄成功。");
+                    }
 
-            if (!isAuthReady) { return (<div className="flex items-center justify-center min-h-screen bg-gray-100"><div className="text-xl text-gray-700">載入中...</div></div>); }
+                    // Also add new productType/outcomeType to managed lists if they don't exist
+                    const productTypesSettingsRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
+                    const outcomeTypesSettingsRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
+
+                    if (productType.trim() && !managedProductTypes.includes(productType.trim())) {
+                        await window.firebase.setDoc(window.firebase.doc(productTypesSettingsRef, productType.trim()), { exists: true });
+                    }
+
+                    // Default outcome types if not already present
+                    if (!managedOutcomeTypes.includes('成功')) {
+                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesSettingsRef, '成功'), { exists: true });
+                    }
+                    if (!managedOutcomeTypes.includes('失敗')) {
+                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesSettingsRef, '失敗'), { exists: true });
+                    }
+                    if (!managedOutcomeTypes.includes('待定')) {
+                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesSettingsRef, '待定'), { exists: true });
+                    }
+
+
+                    resetFields(); // Clear fields after saving
+                } catch (error) {
+                    console.error("Error saving document:", error);
+                    setErrorMessage("儲存紀錄失敗。");
+                }
+            };
+
+            const updateTransactionStatus = async (id, newStatus, outcomeNotes = '') => {
+                setErrorMessage('');
+                if (!db || !userId) {
+                    setErrorMessage("資料庫未準備好或未登入。");
+                    return;
+                }
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const docRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions`, id);
+                    const docSnap = await window.firebase.getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        const recordData = docSnap.data();
+                        let actualReturn = 0;
+                        if (newStatus === 'completed_success') {
+                            actualReturn = recordData.transactionAmount * (recordData.expectedReturnRate / 100);
+                        } else if (newStatus === 'completed_failure') {
+                            actualReturn = -recordData.transactionAmount; // Represent loss as negative of amount
+                        }
+
+                        await window.firebase.updateDoc(docRef, {
+                            actualOutcome: newStatus,
+                            actualReturn: actualReturn,
+                            status: newStatus,
+                            outcomeNotes: outcomeNotes,
+                            settledBy: userId,
+                            settledAt: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
+                        });
+                    } else {
+                        setErrorMessage("找不到該紀錄。");
+                    }
+                } catch (error) {
+                    console.error("Error updating document:", error);
+                    setErrorMessage("更新紀錄失敗。");
+                }
+            };
+
+            const handleEditRecord = (record) => {
+                setClientName(record.clientName);
+                setContactInfo(record.contactInfo || '');
+                setProductType(record.productType);
+                setTransactionAmount(record.transactionAmount.toString());
+                setExpectedReturnRate(record.expectedReturnRate.toString());
+                setNotes(record.notes || '');
+                setEditingRecordId(record.id);
+                setErrorMessage('');
+                setProjectedReturn(null);
+                setTargetGoalAmount('');
+                setRequiredInvestmentForGoal(null);
+            };
+
+            const handleCancelEdit = () => {
+                setEditingRecordId(null);
+                resetFields();
+            };
+
+            const handleDeleteRecord = async () => {
+                setErrorMessage('');
+                if (!db || !userId || !recordToDelete) {
+                    setErrorMessage("無法刪除紀錄，資料庫未準備好或未登入。");
+                    setShowConfirmDeleteDialog(false);
+                    setRecordToDelete(null);
+                    return;
+                }
+
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const docRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions`, recordToDelete);
+                    await window.firebase.deleteDoc(docRef);
+                    setErrorMessage("紀錄已成功刪除。");
+                    setShowConfirmDeleteDialog(false);
+                    setRecordToDelete(null);
+                } catch (error) {
+                    console.error("Error deleting document:", error);
+                    setErrorMessage("刪除紀錄失敗。");
+                    setShowConfirmDeleteDialog(false);
+                    setRecordToDelete(null);
+                }
+            };
+
+            // Functions to manage product types in settings
+            const handleAddManagedProductType = async () => {
+                if (newProductTypeInput.trim() === '') {
+                    setErrorMessage("請輸入有效的產品/服務類型名稱。");
+                    return;
+                }
+                if (managedProductTypes.includes(newProductTypeInput.trim())) {
+                    setErrorMessage("此產品/服務類型已存在。");
+                    return;
+                }
+                setErrorMessage('');
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const productTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
+                    await window.firebase.setDoc(window.firebase.doc(productTypesRef, newProductTypeInput.trim()), { exists: true });
+                    setNewProductTypeInput('');
+                } catch (error) {
+                    console.error("Error adding product type:", error);
+                    setErrorMessage("新增產品/服務類型失敗。");
+                }
+            };
+
+            const handleDeleteManagedProductType = async (typeToDelete) => {
+                setErrorMessage('');
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const productTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/productTypes`);
+                    await window.firebase.deleteDoc(window.firebase.doc(productTypesRef, typeToDelete));
+                } catch (error) {
+                    console.error("Error deleting product type:", error);
+                    setErrorMessage("刪除產品/服務類型失敗。");
+                }
+            };
+
+            // Functions to manage outcome types in settings
+            const handleAddManagedOutcomeType = async () => {
+                if (newOutcomeTypeInput.trim() === '') {
+                    setErrorMessage("請輸入有效的結果類型名稱。");
+                    return;
+                }
+                if (managedOutcomeTypes.includes(newOutcomeTypeInput.trim())) {
+                    setErrorMessage("此結果類型已存在。");
+                    return;
+                }
+                setErrorMessage('');
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
+                    await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, newOutcomeTypeInput.trim()), { exists: true });
+                    setNewOutcomeTypeInput('');
+                } catch (error) {
+                    console.error("Error adding outcome type:", error);
+                    setErrorMessage("新增結果類型失敗。");
+                }
+            };
+
+            const handleDeleteManagedOutcomeType = async (typeToDelete) => {
+                setErrorMessage('');
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
+                    await window.firebase.deleteDoc(window.firebase.doc(outcomeTypesRef, typeToDelete));
+                } catch (error) {
+                    console.error("Error deleting outcome type:", error);
+                    setErrorMessage("刪除結果類型失敗。");
+                }
+            };
+
+            const filteredTransactionsHistory = React.useMemo(() => {
+                const filtered = transactionsHistory.filter(record => {
+                    const recordDate = new Date(record.date.replace(/-/g, '/'));
+                    const startDateOnly = startDate ? new Date(startDate) : null;
+                    const endDateOnly = endDate ? new Date(endDate) : null;
+
+                    if (endDateOnly) {
+                        endDateOnly.setHours(23, 59, 59, 999); // Include the entire end day
+                    }
+
+                    const isAfterStartDate = !startDateOnly || recordDate >= startDateOnly;
+                    const isBeforeEndDate = !endDateOnly || recordDate <= endDateOnly;
+
+                    const isMatchingProductType = !selectedProductTypeFilter || record.productType === selectedProductTypeFilter;
+                    const isMatchingOutcomeStatus = !selectedOutcomeStatusFilter || record.status === selectedOutcomeStatusFilter;
+
+                    return isAfterStartDate && isBeforeEndDate && isMatchingProductType && isMatchingOutcomeStatus;
+                });
+                // Sort by date in descending order (newest first)
+                return filtered.sort((a, b) => {
+                    const dateA = new Date(a.date.replace(/-/g, '/')).getTime();
+                    const dateB = new Date(b.date.replace(/-/g, '/')).getTime();
+                    return dateB - dateA;
+                });
+            }, [transactionsHistory, startDate, endDate, selectedProductTypeFilter, selectedOutcomeStatusFilter]);
+
+            const totalTransactionValueFiltered = filteredTransactionsHistory.reduce((sum, record) => {
+                return sum + record.transactionAmount;
+            }, 0).toFixed(2);
+
+            const totalActualReturnFiltered = filteredTransactionsHistory.reduce((sum, record) => {
+                if (record.status === 'completed_success' || record.status === 'completed_failure') {
+                    return sum + record.actualReturn;
+                }
+                return sum;
+            }, 0).toFixed(2);
+
+            const { totalSuccessful, totalUnsuccessful, averageSuccessRate } = React.useMemo(() => {
+                let successful = 0;
+                let unsuccessful = 0;
+                filteredTransactionsHistory.forEach(record => {
+                    if (record.status === 'completed_success') {
+                        successful++;
+                    } else if (record.status === 'completed_failure') {
+                        unsuccessful++;
+                    }
+                });
+                const totalSettledTransactions = successful + unsuccessful;
+                const avgSuccessRate = totalSettledTransactions > 0 ? ((successful / totalSettledTransactions) * 100).toFixed(2) : '0.00';
+                return { totalSuccessful: successful, totalUnsuccessful: unsuccessful, averageSuccessRate: avgSuccessRate };
+            }, [filteredTransactionsHistory]);
+
+            // Calculate product type counts for display
+            const productTypeCounts = React.useMemo(() => {
+                const counts = {};
+                filteredTransactionsHistory.forEach(record => {
+                    counts[record.productType] = (counts[record.productType] || 0) + 1;
+                });
+                return counts;
+            }, [filteredTransactionsHistory]);
+
+            const resetFields = () => {
+                setClientName('');
+                setContactInfo('');
+                setProductType('');
+                setTransactionAmount('');
+                setExpectedReturnRate('');
+                setNotes('');
+                setProjectedReturn(null);
+                setErrorMessage('');
+                setStartDate(getTodayDateString());
+                setEndDate(getTodayDateString());
+                setSelectedProductTypeFilter('');
+                setSelectedOutcomeStatusFilter('');
+                setTargetGoalAmount('');
+                setRequiredInvestmentForGoal(null);
+                setEditingRecordId(null);
+            };
+
+            const exportToCsv = () => {
+                if (filteredTransactionsHistory.length === 0) {
+                    setErrorMessage('沒有紀錄可以導出。');
+                    return;
+                }
+
+                const headers = ["序號", "日期時間", "客戶名稱", "聯絡資訊", "產品/服務類型", "交易金額", "預期報酬率(%)", "實際結果", "實際報酬", "備註"];
+                const csvRows = [];
+
+                csvRows.push(headers.join(','));
+
+                filteredTransactionsHistory.forEach((record, index) => {
+                    const row = [
+                        index + 1,
+                        record.date,
+                        record.clientName,
+                        record.contactInfo || '',
+                        record.productType,
+                        record.transactionAmount,
+                        record.expectedReturnRate,
+                        record.status === 'pending' ? '待定' : (record.actualOutcome === 'completed_success' ? '成功' : '失敗'),
+                        record.status === 'pending' ? '待定' : record.actualReturn.toFixed(2),
+                        record.notes || ''
+                    ];
+                    csvRows.push(row.join(','));
+                });
+
+                csvRows.push('');
+                csvRows.push(`篩選後總交易金額:,${totalTransactionValueFiltered} NTD`);
+                csvRows.push(`篩選後總實際報酬:,${totalActualReturnFiltered} NTD`);
+                csvRows.push(`成功交易數:,${totalSuccessful}`);
+                csvRows.push(`失敗交易數:,${totalUnsuccessful}`);
+                csvRows.push(`平均成功率:,${averageSuccessRate}%`);
+                csvRows.push('');
+                Object.entries(productTypeCounts).forEach(([type, count]) => {
+                    csvRows.push(`${type} 交易數:,${count}`);
+                });
+
+
+                const csvString = csvRows.join('\n');
+                const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `金融CRM紀錄_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            };
+
+            const handlePrintRecordsOnly = () => {
+                const printContent = document.getElementById('transaction-history-section');
+                if (!printContent) {
+                    setErrorMessage('找不到交易紀錄區塊進行列印。');
+                    return;
+                }
+
+                // Construct the HTML content for the new print window
+                let printContentHtml = `
+                    <!DOCTYPE html>
+                    <html lang="zh-TW">
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>交易紀錄列印</title>
+                        <style>
+                            body { font-family: 'Inter', sans-serif; margin: 20px; }
+                            h2 { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                            th { background-color: #f2f2f2; }
+                            .success-text { color: #16A34A; font-weight: bold; }
+                            .failure-text { color: #DC2626; font-weight: bold; }
+                            .blue-text { color: #2563EB; font-weight: bold; }
+                            .red-text { color: #DC2626; font-weight: bold; }
+                            .outcome-badge {
+                                display: inline-block;
+                                padding: 4px 8px;
+                                border-radius: 9999px;
+                                font-weight: 600;
+                                font-size: 0.8em;
+                                line-height: 1;
+                            }
+                            .success-badge { background-color: #D1FAE5; color: #065F46; }
+                            .failure-badge { background-color: #FEE2E2; color: #991B1B; }
+                        </style>
+                        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+                    </head>
+                    <body>
+                        <h2>交易紀錄</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>序號</th>
+                                    <th>日期時間</th>
+                                    <th>客戶名稱</th>
+                                    <th>產品/服務類型</th>
+                                    <th>交易金額</th>
+                                    <th>預期報酬率(%)</th>
+                                    <th>實際結果</th>
+                                    <th>實際報酬</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filteredTransactionsHistory.map((record, index) => `
+                                    <tr>
+                                        <td>${index + 1}</td>
+                                        <td>${record.date}</td>
+                                        <td>${record.clientName}</td>
+                                        <td>${record.productType}</td>
+                                        <td>${record.transactionAmount}</td>
+                                        <td>${record.expectedReturnRate}%</td>
+                                        <td>
+                                            <span class="outcome-badge ${record.status === 'completed_success' ? 'success-badge' : (record.status === 'completed_failure' ? 'failure-badge' : '')}">
+                                                ${record.status === 'pending' ? '待定' : (record.actualOutcome === 'completed_success' ? '成功' : '失敗')}
+                                            </span>
+                                        </td>
+                                        <td class="${record.status === 'completed_success' ? 'success-text' : (record.status === 'completed_failure' ? 'failure-text' : '')}">
+                                            ${record.status === 'pending' ? '待定' : record.actualReturn.toFixed(2)}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        <div style="text-align: center; margin-top: 20px; font-size: 1.1em; font-weight: bold;">
+                            篩選後總實際報酬:
+                            <span class="${parseFloat(totalActualReturnFiltered) >= 0 ? 'blue-text' : 'red-text'}">
+                                ${totalActualReturnFiltered} NTD
+                            </span>
+                        </div>
+                        <div style="text-align: center; margin-top: 10px; font-size: 1em;">
+                            篩選後總交易金額: ${totalTransactionValueFiltered} NTD
+                        </div>
+                        <div style="text-align: center; margin-top: 10px; font-size: 1em;">
+                            成功交易數: ${totalSuccessful} | 失敗交易數: ${totalUnsuccessful} | 平均成功率: ${averageSuccessRate}%
+                        </div>
+                        ${Object.keys(productTypeCounts).length > 0 ? `
+                            <div style="text-align: center; margin-top: 10px; font-size: 1em;">
+                                ${Object.entries(productTypeCounts).map(([type, count]) => `${type}: ${count} 筆`).join(' | ')}
+                            </div>
+                        ` : ''}
+                        <div style="text-align: center; margin-top: 30px; font-size: 0.8em; color: #6B7280;">
+                            威爾設計版權所有 ver ${currentVersion}
+                        </div>
+                    </body>
+                    </html>
+                `;
+                const printWindow = window.open('', '_blank', 'width=800,height=600');
+                if (printWindow) {
+                    printWindow.document.write(printContentHtml);
+                    printWindow.document.close();
+                    printWindow.focus();
+
+                    printWindow.onload = () => {
+                        printWindow.print();
+                        printWindow.close();
+                    };
+                } else {
+                    setErrorMessage('無法開啟列印視窗，請檢查瀏覽器設定或彈出視窗阻擋。');
+                }
+            };
 
             return (
-                <div className="App">
-                    {currentPage === 'list' ? (
-                        <CustomerList
-                            customers={customers}
-                            onAddBorrower={handleAddBorrower}
-                            onEditBorrower={handleEditBorrower}
-                            onDeleteBorrower={handleDeleteBorrower}
-                            userId={currentUserId}
-                            onGoogleSignIn={handleGoogleSignIn}
-                            onSignOut={handleSignOut}
-                            userName={userName}
-                        />
-                    ) : (
-                        <BorrowerForm customer={editingCustomer} onSave={handleSaveBorrower} onCancel={handleCancel} onViewCashFlow={handleViewCashFlow}/>
+                <div className="min-h-screen bg-gradient-to-br from-blue-100 to-white flex flex-col items-center justify-center p-4 font-sans">
+                    {/* Display loading state */}
+                    {loadingFirebase && (
+                        <div className="absolute inset-0 bg-gray-200 bg-opacity-75 flex items-center justify-center z-50">
+                            <div className="text-gray-800 text-lg font-bold">載入中...</div>
+                        </div>
                     )}
-                    {showCashFlowModal && selectedCustomerForCashFlow && (<CashFlowModal customer={selectedCustomerForCashFlow} onClose={handleCloseCashFlowModal} userId={currentUserId} appId={canvasAppId} db={db}/>)}
-                    <ConfirmationModal show={showDeleteConfirmModal} message={`您確定要刪除客戶 ${itemToDelete?.name} 嗎？這將同時刪除所有相關金流記錄。`} onConfirm={confirmDeleteAction} onCancel={cancelDeleteAction}/>
+
+                    {/* User Info and Sign-in/Sign-out buttons */}
+                    <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-100 text-gray-700 text-xs px-3 py-2 rounded-full shadow-md z-10">
+                        {userId ? (
+                            <div className="flex items-center">
+                                <span className="font-bold mr-1">登入用戶:</span>
+                                {userName || userEmail || userId}
+                                {userEmail && <span className="ml-2 text-gray-500">({userEmail})</span>}
+                            </div>
+                        ) : (
+                            <span className="font-bold">未登入</span>
+                        )}
+                        <div className="mt-2 sm:mt-0 flex space-x-2">
+                            {userId && !userEmail ? (
+                                <button
+                                    onClick={handleGoogleSignIn}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-full transition duration-200"
+                                    disabled={loadingFirebase || !isAuthReady}
+                                >
+                                    Google 登入
+                                </button>
+                            ) : userId && userEmail ? (
+                                <button
+                                    onClick={handleSignOut}
+                                    className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-full transition duration-200"
+                                    disabled={loadingFirebase || !isAuthReady}
+                                >
+                                    登出
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleGoogleSignIn}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-full transition duration-200"
+                                    disabled={loadingFirebase || !isAuthReady}
+                                >
+                                    Google 登入
+                                </button>
+                            )}
+                        </div>
+                        {/* Settings Button */}
+                        <button
+                            onClick={() => setShowSettingsModal(true)}
+                            className="absolute top-2 right-4 p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                            title="設定"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.16-1.47-1.16-1.85 0L9 4.38a1 1 0 01-.78.78l-1.16.38c-1.16.38-1.16 1.47 0 1.85l.38.78a1 1 0 01.78.78l.38 1.16c.38 1.16 1.47 1.16 1.85 0l.78-.38a1 1 0 01.78-.78l1.16-.38c1.16-.38 1.16-1.47 0-1.85l-.38-.78a1 1 0 01-.78-.78l-.38-1.16zM15.5 13a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM17.5 12a.5.5 0 00-.5.5v2a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-2a.5.5 0 00-.5-.5h-2z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Confirmation Dialog for single record delete */}
+                    {showConfirmDeleteDialog && recordToDelete && (
+                        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+                            <div className="bg-white p-6 rounded-lg shadow-xl text-center">
+                                <p className="text-lg font-semibold mb-4">確定要刪除這筆紀錄嗎？</p>
+                                <p className="text-sm text-gray-600 mb-6">此操作無法復原。</p>
+                                <div className="flex justify-center space-x-4">
+                                    <button
+                                        onClick={() => { setShowConfirmDeleteDialog(false); setRecordToDelete(null); }}
+                                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    >
+                                        取消
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteRecord}
+                                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    >
+                                        確認刪除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Settings Modal */}
+                    {showSettingsModal && (
+                        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+                                <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">設定</h2>
+                                {/* Product Type Management */}
+                                <div className="mb-4 border-t pt-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">管理產品/服務類型</h3>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {managedProductTypes.map(type => (
+                                            <span key={type} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center">
+                                                {type}
+                                                <button
+                                                    onClick={() => handleDeleteManagedProductType(type)}
+                                                    className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
+                                                >
+                                                    &times;
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex">
+                                        <input
+                                            type="text"
+                                            placeholder="新增產品/服務類型"
+                                            value={newProductTypeInput}
+                                            onChange={(e) => setNewProductTypeInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleAddManagedProductType();
+                                                }
+                                            }}
+                                            className="flex-grow px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                        <button
+                                            onClick={handleAddManagedProductType}
+                                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r-lg transition duration-200"
+                                        >
+                                            新增
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Outcome Type Management */}
+                                <div className="mb-4 border-t pt-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">管理結果類型</h3>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {managedOutcomeTypes.map(type => (
+                                            <span key={type} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm flex items-center">
+                                                {type}
+                                                <button
+                                                    onClick={() => handleDeleteManagedOutcomeType(type)}
+                                                    className="ml-1 text-green-600 hover:text-green-800 focus:outline-none"
+                                                >
+                                                    &times;
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex">
+                                        <input
+                                            type="text"
+                                            placeholder="新增結果類型"
+                                            value={newOutcomeTypeInput}
+                                            onChange={(e) => setNewOutcomeTypeInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleAddManagedOutcomeType();
+                                                }
+                                            }}
+                                            className="flex-grow px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                        <button
+                                            onClick={handleAddManagedOutcomeType}
+                                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r-lg transition duration-200"
+                                        >
+                                            新增
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="text-center mt-4">
+                                    <button
+                                        onClick={() => setShowSettingsModal(false)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    >
+                                        確定更新
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Main container for CRM form and history, using flexbox for side-by-side layout */}
+                    <div className="flex flex-col md:flex-row md:space-x-8 w-full max-w-7xl mt-20 sm:mt-24">
+                        {/* CRM Input Form section (left side) */}
+                        <div className="bg-white p-8 rounded-xl shadow-2xl w-full md:w-2/5 mb-8 md:mb-0 transform transition-all duration-300 hover:scale-[1.01]">
+                            <h1 className="text-3xl font-extrabold text-gray-900 mb-6 text-center">
+                                新增客戶交易/互動
+                            </h1>
+
+                            {/* Input field for Client Name */}
+                            <div className="mb-4">
+                                <label htmlFor="clientName" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    客戶名稱:
+                                </label>
+                                <input
+                                    type="text"
+                                    id="clientName"
+                                    value={clientName}
+                                    onChange={(e) => setClientName(e.target.value)}
+                                    placeholder="例如: 王小明"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
+                                />
+                            </div>
+
+                            {/* Input field for Contact Info */}
+                            <div className="mb-4">
+                                <label htmlFor="contactInfo" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    聯絡資訊 (Email/電話):
+                                </label>
+                                <input
+                                    type="text"
+                                    id="contactInfo"
+                                    value={contactInfo}
+                                    onChange={(e) => setContactInfo(e.target.value)}
+                                    placeholder="例如: client@example.com 或 0912345678"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
+                                />
+                            </div>
+
+                            {/* Product Type Dropdown/Input */}
+                            <div className="mb-4">
+                                <label htmlFor="productType" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    產品/服務類型:
+                                </label>
+                                <select
+                                    id="productType"
+                                    value={productType}
+                                    onChange={(e) => setProductType(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                >
+                                    <option value="">請選擇</option>
+                                    {managedProductTypes.map(type => (
+                                        type && <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
+                                {(!productType || !managedProductTypes.includes(productType)) && (
+                                    <input
+                                        type="text"
+                                        value={productType}
+                                        onChange={(e) => setProductType(e.target.value)}
+                                        placeholder="輸入新產品/服務類型"
+                                        className="w-full px-4 py-2 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
+                                    />
+                                )}
+                            </div>
+
+                            {/* Input field for Transaction Amount */}
+                            <div className="mb-4">
+                                <label htmlFor="transactionAmount" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    交易金額 (NTD):
+                                </label>
+                                <input
+                                    type="number"
+                                    id="transactionAmount"
+                                    value={transactionAmount}
+                                    onChange={(e) => setTransactionAmount(e.target.value)}
+                                    placeholder="例如: 50000"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
+                                />
+                            </div>
+
+                            {/* Input field for Expected Return Rate */}
+                            <div className="mb-4">
+                                <label htmlFor="expectedReturnRate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    預期報酬率 (%):
+                                </label>
+                                <input
+                                    type="number"
+                                    id="expectedReturnRate"
+                                    value={expectedReturnRate}
+                                    onChange={(e) => setExpectedReturnRate(e.target.value)}
+                                    placeholder="例如: 5.0 (代表 5%)"
+                                    step="0.01"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRecordButtonClick(); }}
+                                />
+                            </div>
+
+                            {/* Input field for Notes */}
+                            <div className="mb-4">
+                                <label htmlFor="notes" className="block text-gray-700 text-sm font-semibold mb-2">
+                                    備註:
+                                </label>
+                                <textarea
+                                    id="notes"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="例如: 客戶對此產品感興趣，需進一步追蹤。"
+                                    rows="3"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                ></textarea>
+                            </div>
+
+                            {/* Error message display */}
+                            {errorMessage && (
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+                                    <span className="block sm:inline">{errorMessage}</span>
+                                </div>
+                            )}
+
+                            {/* Calculation and Save/Reset/Cancel buttons */}
+                            <div className="flex space-x-4 mb-6">
+                                <button
+                                    onClick={handleSaveRecordButtonClick}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75"
+                                    disabled={loadingFirebase || !isAuthReady}
+                                >
+                                    {editingRecordId ? '更新紀錄' : '新增紀錄'}
+                                </button>
+                                <button
+                                    onClick={resetFields}
+                                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75"
+                                >
+                                    重設
+                                </button>
+                                {editingRecordId && (
+                                    <button
+                                        onClick={handleCancelEdit}
+                                        className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 ml-2"
+                                    >
+                                        取消編輯
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Display area for the projected return */}
+                            {projectedReturn !== null && (
+                                <div className="mt-6 p-6 bg-gray-50 rounded-xl shadow-inner text-center mb-4">
+                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">單次交易預覽 (預期報酬):</h2>
+                                    <p className={`text-4xl font-extrabold ${parseFloat(projectedReturn) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        預期報酬: {projectedReturn} NTD
+                                    </p>
+                                    {parseFloat(projectedReturn) >= 0 && (
+                                        <p className="text-sm text-gray-600 mt-2">此為若交易成功，預期之淨報酬。</p>
+                                    )}
+                                    {parseFloat(projectedReturn) < 0 && (
+                                        <p className="text-sm text-gray-600 mt-2">此為若交易成功，預期之淨虧損。</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Section for Target Goal Calculation */}
+                            <div className="mt-6 p-6 bg-gray-100 rounded-xl shadow-inner text-center">
+                                <h2 className="text-xl font-semibold text-gray-800 mb-4">目標報酬所需投資計算</h2>
+                                <div className="mb-4">
+                                    <label htmlFor="targetGoalAmount" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        目標報酬金額 (NTD):
+                                    </label>
+                                    <input
+                                        type="number"
+                                        id="targetGoalAmount"
+                                        value={targetGoalAmount}
+                                        onChange={(e) => setTargetGoalAmount(e.target.value)}
+                                        placeholder="例如: 5000"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    />
+                                </div>
+                                {requiredInvestmentForGoal !== null && (
+                                    <p className="text-lg font-bold text-gray-800 mt-4">
+                                        為達到目標報酬，需投資:
+                                        <span className="ml-2 text-purple-600 text-3xl">
+                                            {requiredInvestmentForGoal} NTD
+                                        </span>
+                                    </p>
+                                )}
+                                {(parseFloat(expectedReturnRate) <= 0 && targetGoalAmount !== '') && (
+                                    <p className="text-red-500 text-sm mt-2">
+                                        預期報酬率過低或為零，無法達到目標報酬，或需投資極大金額。
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Display area for transaction history (right side) */}
+                        <div id="transaction-history-section" className="bg-white p-8 rounded-xl shadow-2xl w-full md:w-3/5 overflow-y-auto max-h-[85vh] min-h-[200px]">
+                            <h2 className="text-xl font-extrabold text-gray-900 mb-4 text-center">客戶交易/互動紀錄</h2>
+
+                            {/* Date and Type filter inputs and Export/Print buttons */}
+                            <div className="mb-4 flex flex-col sm:flex-row sm:space-x-4 items-end">
+                                <div className="flex-1 mb-4 sm:mb-0">
+                                    <label htmlFor="startDate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        開始日期:
+                                    </label>
+                                    <input
+                                        type="date"
+                                        id="startDate"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    />
+                                </div>
+                                <div className="flex-1 mb-4 sm:mb-0">
+                                    <label htmlFor="endDate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        結束日期:
+                                    </label>
+                                    <input
+                                        type="date"
+                                        id="endDate"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    />
+                                </div>
+                                {/* Product Type Filter Dropdown */}
+                                <div className="flex-1 mb-4 sm:mb-0">
+                                    <label htmlFor="productTypeFilter" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        產品/服務類型篩選:
+                                    </label>
+                                    <select
+                                        id="productTypeFilter"
+                                        value={selectedProductTypeFilter}
+                                        onChange={(e) => setSelectedProductTypeFilter(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    >
+                                        <option value="">所有類型</option>
+                                        {managedProductTypes.map(type => (
+                                            type && <option key={type} value={type}>{type}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {/* Outcome Status Filter Dropdown */}
+                                <div className="flex-1 mb-4 sm:mb-0">
+                                    <label htmlFor="outcomeStatusFilter" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        結果狀態篩選:
+                                    </label>
+                                    <select
+                                        id="outcomeStatusFilter"
+                                        value={selectedOutcomeStatusFilter}
+                                        onChange={(e) => setSelectedOutcomeStatusFilter(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    >
+                                        <option value="">所有狀態</option>
+                                        <option value="pending">待定</option>
+                                        <option value="completed_success">成功</option>
+                                        <option value="completed_failure">失敗</option>
+                                    </select>
+                                </div>
+
+                                <button
+                                    onClick={exportToCsv}
+                                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 mb-2 sm:mb-0"
+                                >
+                                    導出紀錄
+                                </button>
+                                <button
+                                    onClick={handlePrintRecordsOnly}
+                                    className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75"
+                                >
+                                    列印紀錄
+                                </button>
+                            </div>
+
+                            {filteredTransactionsHistory.length > 0 ? (
+                                <>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full bg-white rounded-lg shadow-md">
+                                            <thead>
+                                                <tr className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
+                                                    <th className="py-3 px-6 text-left">序號</th>
+                                                    <th className="py-3 px-6 text-left">日期時間</th>
+                                                    <th className="py-3 px-6 text-left">客戶名稱</th>
+                                                    <th className="py-3 px-6 text-left">產品/服務類型</th>
+                                                    <th className="py-3 px-6 text-left">交易金額</th>
+                                                    <th className="py-3 px-6 text-left">預期報酬率(%)</th>
+                                                    <th className="py-3 px-6 text-left">實際結果</th>
+                                                    <th className="py-3 px-6 text-left">實際報酬</th>
+                                                    <th className="py-3 px-6 text-left">操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="text-gray-600 text-sm font-light">
+                                                {filteredTransactionsHistory.map((record, index) => (
+                                                    <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-100">
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{index + 1}</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.date}</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.clientName}</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.productType}</td>
+                                                        <td className="py-3 px-6 text-left whitespace-nowrap">{record.transactionAmount}</td>
+                                                        <td className="py-3 px-6 text-left">{record.expectedReturnRate}%</td>
+                                                        <td className="py-3 px-6 text-left">
+                                                            {record.status === 'pending' ? (
+                                                                <div className="flex space-x-2">
+                                                                    <button
+                                                                        onClick={() => updateTransactionStatus(record.id, 'completed_success')}
+                                                                        className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        disabled={loadingFirebase || !isAuthReady}
+                                                                    >
+                                                                        成功
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => updateTransactionStatus(record.id, 'completed_failure')}
+                                                                        className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        disabled={loadingFirebase || !isAuthReady}
+                                                                    >
+                                                                        失敗
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <span className={`px-2 py-1 font-semibold leading-tight rounded-full ${record.actualOutcome === 'completed_success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                    {record.actualOutcome === 'completed_success' ? '成功' : '失敗'}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className={`py-3 px-6 text-left ${record.status === 'pending' ? 'text-gray-500' : (record.actualReturn >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                                                            ${record.status === 'pending' ? '待定' : record.actualReturn.toFixed(2)}
+                                                        </td>
+                                                        <td className="py-3 px-6 text-left">
+                                                            <div className="flex space-x-2">
+                                                                <button
+                                                                    onClick={() => handleEditRecord(record)}
+                                                                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                    disabled={loadingFirebase || !isAuthReady}
+                                                                >
+                                                                    編輯
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => { setShowConfirmDeleteDialog(true); setRecordToDelete(record.id); }}
+                                                                    className="bg-gray-400 hover:bg-gray-500 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                    disabled={loadingFirebase || !isAuthReady}
+                                                                >
+                                                                    刪除
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="mt-4 text-center text-lg font-bold">
+                                        篩選後總實際報酬:
+                                        <span className={`ml-2 ${parseFloat(totalActualReturnFiltered) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                            ${totalActualReturnFiltered} NTD
+                                        </span>
+                                    </div>
+                                    {/* Success/Failure Counts and Average Success Rate */}
+                                    <div className="mt-2 text-center text-base font-semibold text-gray-700">
+                                        篩選後總交易金額: <span className="text-blue-700">${totalTransactionValueFiltered} NTD</span> |
+                                        成功交易數: <span className="text-green-700">{totalSuccessful}</span> |
+                                        失敗交易數: <span className="text-red-700">{totalUnsuccessful}</span> |
+                                        平均成功率: <span className="text-blue-700">{averageSuccessRate}%</span>
+                                    </div>
+                                    {/* Product Type Counts Display */}
+                                    {Object.keys(productTypeCounts).length > 0 && (
+                                        <div className="mt-2 text-center text-base font-semibold text-gray-700">
+                                            {Object.entries(productTypeCounts).map(([type, count]) => (
+                                                <span key={type} className="mr-4">
+                                                    {type}: <span className="text-blue-700">{count} 筆</span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {/* Conditional General advice for overall profit/loss */}
+                                    <div className="mt-4 text-center text-sm text-gray-600 italic">
+                                        {parseFloat(totalActualReturnFiltered) > 0 ? (
+                                            transactionSuccessAdvice[Math.floor(Math.random() * transactionSuccessAdvice.length)]
+                                        ) : parseFloat(totalActualReturnFiltered) < 0 ? (
+                                            transactionFailureAdvice[Math.floor(Math.random() * transactionFailureAdvice.length)]
+                                        ) : (
+                                            transactionNeutralAdvice[Math.floor(Math.random() * transactionNeutralAdvice.length)]
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-center text-gray-500 mt-8">
+                                    沒有符合篩選條件的交易紀錄。
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    {/* Copyright notice at the bottom */}
+                    <div className="w-full text-center text-gray-600 text-sm mt-8 pb-4">
+                        威爾設計版權所有 ver {currentVersion}
+                        <button
+                            onClick={() => setShowUpdateLogModal(true)}
+                            className="ml-2 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded-full transition duration-200"
+                        >
+                            更新紀錄
+                        </button>
+                    </div>
+
+                    {/* Update Log Modal */}
+                    {showUpdateLogModal && (
+                        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+                                <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">更新紀錄</h2>
+                                {versionHistoryData.map((v, i) => (
+                                    <div key={v.version} className={`mb-4 pb-4 ${i < versionHistoryData.length - 1 ? 'border-b border-gray-200' : ''}`}>
+                                        <p className="text-lg font-semibold text-blue-700">版本: {v.version}</p>
+                                        <p className="text-sm text-gray-500 mb-2">日期: {v.date}</p>
+                                        <p className="text-gray-700">{v.content}</p>
+                                    </div>
+                                ))}
+                                <div className="text-center mt-4">
+                                    <button
+                                        onClick={() => setShowUpdateLogModal(false)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                    >
+                                        關閉
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
-        };
-
-        // Render the App component
-        const rootElement = document.getElementById('root');
-        if (ReactDOM.createRoot) {
-            ReactDOM.createRoot(rootElement).render(<App />);
-        } else {
-            // Fallback for older React versions if createRoot is not available
-            ReactDOM.render(<App />, rootElement);
         }
+
+        // Mount the React app to the root div
+        const domContainer = document.querySelector('#root');
+        const root = ReactDOM.createRoot(domContainer);
+        root.render(<FinancialCRM />);
     </script>
 </body>
 </html>
