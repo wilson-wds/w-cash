@@ -161,6 +161,12 @@
 
             // New client detail fields
             const [contactMethod, setContactMethod] = React.useState(''); // 聯絡方式
+            const [homePhone, setHomePhone] = React.useState(''); // 住宅電話
+            const [lineId, setLineId] = React.useState(''); // Line ID
+            const [facebook, setFacebook] = React.useState(''); // FB
+            const [instagram, setInstagram] = React.useState(''); // IG
+            const [idNumber, setIdNumber] = React.useState(''); // 身分證字號
+            const [birthday, setBirthday] = React.useState(''); // 生日
             const [address, setAddress] = React.useState(''); // 住址
             const [residentialArea, setResidentialArea] = React.useState(''); // 居住地
             const [occupation, setOccupation] = React.useState(''); // 職業
@@ -201,6 +207,36 @@
 
             // Version history data
             const versionHistoryData = [
+                {
+                    version: "1.10.2",
+                    date: "2025-05-30",
+                    content: "修正 `ReferenceError: outcomeTypesRef is not defined` 錯誤。修正 `emergencyContact22Name` 的打字錯誤。修正利息計算邏輯，確保利率是所選週期下的實際利率。客戶列表的「淨額」欄位現在會正確顯示「待計算」或實際淨利。",
+                },
+                {
+                    version: "1.10.1",
+                    date: "2025-05-30",
+                    content: "修正 `emergencyContact22Name` 的打字錯誤。修正利息計算邏輯，確保利率是所選週期下的實際利率。客戶列表的「淨額」欄位現在會正確顯示「待計算」或實際淨利。",
+                },
+                {
+                    version: "1.10",
+                    date: "2025-05-30",
+                    content: "修正 `ReferenceError: emergencyContact22Name is not defined` 錯誤。修正利息計算邏輯：現在利率將被視為所選週期下的實際利率。客戶列表新增「淨額」欄位。",
+                },
+                {
+                    version: "1.9.9",
+                    date: "2025-05-30",
+                    content: "客戶列表頁面：在「借款金額」與「利率」之間新增「淨額」欄位。該欄位顯示單一客戶的淨利，並在金流紀錄更新時即時反映。",
+                },
+                {
+                    version: "1.9.8",
+                    date: "2025-05-30",
+                    content: "客戶列表頁面：移除「淨利」欄位。新增客戶頁面：新增住宅電話、Line ID、FB、IG、身分證字號、生日欄位，並調整欄位佈局。",
+                },
+                {
+                    version: "1.9.7",
+                    date: "2025-05-30",
+                    content: "客戶列表頁面：移除「淨利」欄位。金流紀錄列表：確認排序為最新新增的紀錄顯示在最上方。新增金流或刪除金流後，客戶列表的「淨利」欄位會即時更新。",
+                },
                 {
                     version: "1.9.6",
                     date: "2025-05-30",
@@ -522,17 +558,17 @@
                             interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100);
                             break;
                         case '月':
-                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100 / 12);
+                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100); // Corrected: no division by 12 if rate is already monthly
                             break;
                         case '日':
-                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100 / 365);
+                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100); // Corrected: no division by 365 if rate is already daily
                             break;
                         default:
                             interestForPeriod = 0;
                     }
                     setProjectedReturn(interestForPeriod.toFixed(2));
                 }
-            }, [loanAmount, interestRate, interestRatePeriod]);
+            }, [loanAmount, interestRate, interestRatePeriod]); // interestRatePeriod is now a crucial dependency for the label
 
             React.useEffect(() => {
                 calculateProjectedReturn();
@@ -541,32 +577,18 @@
             // Calculate Amount Due Per Period (PMT)
             const calculateAmountDuePerPeriod = React.useCallback((amount, rate, term, periodType, repaymentMethodType) => {
                 const P = parseFloat(amount);
-                let i = parseFloat(rate) / 100; // Convert percentage to decimal
+                let i = parseFloat(rate) / 100; // Convert percentage to decimal. This 'i' is the rate for the specified periodType
                 let n = parseInt(term, 10);
 
                 if (isNaN(P) || P <= 0 || isNaN(i) || i < 0 || (repaymentMethodType === '本+利' && (isNaN(n) || n <= 0))) {
                     return null; // Invalid inputs
                 }
 
-                // Adjust interest rate and term based on period type
-                switch (periodType) {
-                    case '年':
-                        // i and n are already annual
-                        break;
-                    case '月':
-                        i = i / 12;
-                        // n is already monthly
-                        break;
-                    case '日':
-                        i = i / 365;
-                        // n is already daily
-                        break;
-                    default:
-                        return null; // Unknown period type
-                }
+                // No adjustment to 'i' needed here based on periodType, as 'rate' is assumed to be the rate for 'periodType'
+                // The 'periodType' is only relevant for the interpretation of 'rate' and 'term' units.
 
                 if (repaymentMethodType === '純繳利息') {
-                    return (P * i).toFixed(2); // Only interest payment
+                    return (P * i).toFixed(2); // Only interest payment for one period
                 } else if (repaymentMethodType === '本+利') {
                     if (i === 0) {
                         return (P / n).toFixed(2); // Simple division if no interest
@@ -627,6 +649,8 @@
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
                     const transactionsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions`);
+                    // Define outcomeTypesRef here to be in scope
+                    const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
 
                     const recordData = {
                         clientName: clientName.trim(),
@@ -638,6 +662,12 @@
                         notes: notes.trim(),
                         // New client detail fields
                         contactMethod: contactMethod.trim(),
+                        homePhone: homePhone.trim(), // 新增
+                        lineId: lineId.trim(), // 新增
+                        facebook: facebook.trim(), // 新增
+                        instagram: instagram.trim(), // 新增
+                        idNumber: idNumber.trim(), // 新增
+                        birthday: birthday.trim(), // 新增
                         address: address.trim(),
                         residentialArea: residentialArea.trim(),
                         occupation: occupation.trim(),
@@ -669,15 +699,14 @@
                     }
 
                     // Default outcome types if not already present
-                    const outcomeTypesSettingsRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
                     if (!managedOutcomeTypes.includes('成交')) {
-                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesSettingsRef, '成交'), { exists: true });
+                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '成交'), { exists: true });
                     }
                     if (!managedOutcomeTypes.includes('失敗')) {
-                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesSettingsRef, '失敗'), { exists: true });
+                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '失敗'), { exists: true });
                     }
                     if (!managedOutcomeTypes.includes('待定')) {
-                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesSettingsRef, '待定'), { exists: true });
+                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '待定'), { exists: true });
                     }
 
                     resetFields();
@@ -747,6 +776,12 @@
                 setNotes(record.notes || '');
                 // Set new fields for editing
                 setContactMethod(record.contactMethod || '');
+                setHomePhone(record.homePhone || ''); // 新增
+                setLineId(record.lineId || ''); // 新增
+                setFacebook(record.facebook || ''); // 新增
+                setInstagram(record.instagram || ''); // 新增
+                setIdNumber(record.idNumber || ''); // 新增
+                setBirthday(record.birthday || ''); // 新增
                 setAddress(record.address || '');
                 setResidentialArea(record.residentialArea || '');
                 setOccupation(record.occupation || '');
@@ -1008,27 +1043,30 @@
 
             const totalActualProfitAppLevel = React.useMemo(() => {
                 return filteredTransactionsHistory.reduce((sum, record) => {
-                    if (record.status === 'completed_success' || record.status === 'completed_failure') {
-                        return sum + (record.actualProfit || 0); // Use actualProfit field
+                    if (record.actualProfit !== undefined && record.actualProfit !== null) {
+                        return sum + record.actualProfit;
                     }
                     return sum;
                 }, 0);
             }, [filteredTransactionsHistory]);
 
             const totalIncomingFromCashFlowsAppLevel = React.useMemo(() => {
-                // This is a simplified sum. For accurate app-level totals, you'd need to sum all cash flows across all transactions.
-                // For now, it's just summing 'actualProfit' which is calculated based on cash flows for *completed* loans.
-                // To get true '總收入' and '總出款' for the whole app, you'd need to query all cashFlows subcollections.
-                // This is a placeholder for a more complex aggregation.
+                // This sums all positive actualProfit from completed transactions
                 return filteredTransactionsHistory.reduce((sum, record) => {
-                    return sum + (record.actualProfit > 0 ? record.actualProfit : 0); // Only positive actualProfit as income
+                    if (record.status === 'completed_success' && record.actualProfit !== undefined && record.actualProfit !== null) {
+                        return sum + record.actualProfit;
+                    }
+                    return sum;
                 }, 0);
             }, [filteredTransactionsHistory]);
 
             const totalOutgoingFromCashFlowsAppLevel = React.useMemo(() => {
-                // This is a simplified sum. For accurate app-level totals, you'd need to sum all cash flows across all transactions.
+                // This sums all negative actualProfit (as absolute value) from completed transactions
                 return filteredTransactionsHistory.reduce((sum, record) => {
-                    return sum + (record.actualProfit < 0 ? Math.abs(record.actualProfit) : 0); // Only negative actualProfit as outgoing
+                    if (record.status === 'completed_failure' && record.actualProfit !== undefined && record.actualProfit !== null) {
+                        return sum + Math.abs(record.actualProfit);
+                    }
+                    return sum;
                 }, 0);
             }, [filteredTransactionsHistory]);
 
@@ -1043,8 +1081,8 @@
                     return loanRecord.actualProfit;
                 }
 
-                // If actualProfit is not set, return null to indicate it needs calculation
-                return null;
+                // If actualProfit is not set, return '待計算'
+                return '待計算';
             }, [transactionsHistory]);
 
             const totalCustomers = React.useMemo(() => {
@@ -1093,6 +1131,12 @@
                 setEventHistoryRecords([]); // Clear event history
                 // Reset new client detail fields
                 setContactMethod('');
+                setHomePhone(''); // 新增
+                setLineId(''); // 新增
+                setFacebook(''); // 新增
+                setInstagram(''); // 新增
+                setIdNumber(''); // 新增
+                setBirthday(''); // 新增
                 setAddress('');
                 setResidentialArea('');
                 setOccupation('');
@@ -1121,22 +1165,31 @@
                     return;
                 }
 
-                const headers = ["序號", "借款日期", "客戶名稱", "借款金額", "利率(%)", "還款方式", "期數", "實際結果", "聯絡方式", "住址", "居住地", "職業", "公司電話", "公司地址", "出款備註", "緊急聯絡人1", "緊急聯絡人1電話", "緊急聯絡人2", "緊急聯絡人2電話", "一般備註"];
+                const headers = ["序號", "借款日期", "客戶名稱", "借款金額", "淨額", "利率(%)", "還款方式", "期數", "實際結果", "聯絡方式", "住宅電話", "Line ID", "FB", "IG", "身分證字號", "生日", "住址", "居住地", "職業", "公司電話", "公司地址", "出款備註", "緊急聯絡人1", "緊急聯絡人1電話", "緊急聯絡人2", "緊急聯絡人2電話", "一般備註"];
                 const csvRows = [];
 
                 csvRows.push(headers.join(','));
 
                 filteredTransactionsHistory.forEach((record, index) => {
+                    const netProfitValue = calculateLoanNetProfit(record.id);
+                    const netProfitDisplay = typeof netProfitValue === 'string' ? netProfitValue : netProfitValue.toFixed(2);
                     const row = [
                         index + 1,
                         record.date.substring(0, 10), // Only date part
                         record.clientName,
                         record.loanAmount,
+                        netProfitDisplay, // Added Net Profit
                         record.interestRate,
                         record.repaymentMethod,
                         record.loanTerm || 'N/A',
                         record.status === 'pending' ? '待定' : (record.actualOutcome === 'completed_success' ? '成交' : '失敗'),
                         record.contactMethod || '',
+                        record.homePhone || '', // 新增
+                        record.lineId || '', // 新增
+                        record.facebook || '', // 新增
+                        record.instagram || '', // 新增
+                        record.idNumber || '', // 新增
+                        record.birthday || '', // 新增
                         record.address || '',
                         record.residentialArea || '',
                         record.occupation || '',
@@ -1215,6 +1268,7 @@
                                     <th>借款日期</th>
                                     <th>客戶名稱</th>
                                     <th>借款金額</th>
+                                    <th>淨額</th>
                                     <th>利率(%)</th>
                                     <th>還款方式</th>
                                     <th>期數</th>
@@ -1228,6 +1282,7 @@
                                         <td>${record.date.substring(0, 10)}</td>
                                         <td>${record.clientName}</td>
                                         <td>${record.loanAmount}</td>
+                                        <td>${calculateLoanNetProfit(record.id) !== null ? (typeof calculateLoanNetProfit(record.id) === 'number' ? calculateLoanNetProfit(record.id).toFixed(2) : calculateLoanNetProfit(record.id)) : '待計算'}</td>
                                         <td>${record.interestRate}</td>
                                         <td>${record.repaymentMethod}</td>
                                         <td>${record.loanTerm || 'N/A'}</td>
@@ -1330,7 +1385,7 @@
                             title="設定"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.16-1.47-1.16-1.85 0L9 4.38a1 1 0 01-.78.78l-1.16.38c-1.16.38-1.16 1.47 0 1.85l.38.78a1 1 0 01.78.78l.38 1.16c.38 1.16 1.47 1.16 1.85 0l.78-.38a1 1 0 01.78-.78l1.16-.38c1.16-.38 1.16-1.47 0-1.85l-.38-.78a1 1 0 01-.78-.78l-.38-1.16zM15.5 13a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM17.5 12a.5.5 0 00-.5.5v2a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-2a.5.5 0 00-.5-.5h-2z" clipRule="evenodd" />
+                                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.16-1.47-1.16-1.85 0L9 4.38a1 1 0 01-.78.78l-1.16.38c-1.16.38-1.16 1.47 0 1.85l.38.78a1 1 0 01.78.78l.38 1.16c.38 1.16 1.47 1.16 1.85 0l.78-.38a1 1 0 01.78-.78l1.16-.38c1.16-.38 11.16-1.47 0-1.85l-.38-.78a1 1 0 01-.78-.78l-.38-1.16zM15.5 13a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM17.5 12a.5.5 0 00-.5.5v2a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-2a.5.5 0 00-.5-.5h-2z" clipRule="evenodd" />
                             </svg>
                         </button>
                     </div>
@@ -1579,6 +1634,35 @@
                                         />
                                     </div>
 
+                                    {/* ID Number */}
+                                    <div className="mb-4">
+                                        <label htmlFor="idNumber" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            身分證字號:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="idNumber"
+                                            value={idNumber}
+                                            onChange={(e) => setIdNumber(e.target.value)}
+                                            placeholder="例如: A123456789"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                    </div>
+
+                                    {/* Birthday */}
+                                    <div className="mb-4">
+                                        <label htmlFor="birthday" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            生日:
+                                        </label>
+                                        <input
+                                            type="date"
+                                            id="birthday"
+                                            value={birthday}
+                                            onChange={(e) => setBirthday(e.target.value)}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                    </div>
+
                                     {/* Contact Method */}
                                     <div className="mb-4">
                                         <label htmlFor="contactMethod" className="block text-gray-700 text-sm font-semibold mb-2">
@@ -1590,6 +1674,66 @@
                                             value={contactMethod}
                                             onChange={(e) => setContactMethod(e.target.value)}
                                             placeholder="例如: 手機號碼、Email"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                    </div>
+
+                                    {/* Home Phone */}
+                                    <div className="mb-4">
+                                        <label htmlFor="homePhone" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            住宅電話:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="homePhone"
+                                            value={homePhone}
+                                            onChange={(e) => setHomePhone(e.target.value)}
+                                            placeholder="例如: (02)1234-5678"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                    </div>
+
+                                    {/* Line ID */}
+                                    <div className="mb-4">
+                                        <label htmlFor="lineId" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            Line ID:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="lineId"
+                                            value={lineId}
+                                            onChange={(e) => setLineId(e.target.value)}
+                                            placeholder="例如: @yourlineid"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                    </div>
+
+                                    {/* FB */}
+                                    <div className="mb-4">
+                                        <label htmlFor="facebook" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            FB:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="facebook"
+                                            value={facebook}
+                                            onChange={(e) => setFacebook(e.target.value)}
+                                            placeholder="例如: facebook.com/yourprofile"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                    </div>
+
+                                    {/* IG */}
+                                    <div className="mb-4">
+                                        <label htmlFor="instagram" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            IG:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="instagram"
+                                            value={instagram}
+                                            onChange={(e) => setInstagram(e.target.value)}
+                                            placeholder="例如: @yourinstagram"
                                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
                                         />
                                     </div>
@@ -1922,6 +2066,7 @@
                                                         <th className="py-3 px-6 text-left">借款日期</th>
                                                         <th className="py-3 px-6 text-left">客戶名稱</th>
                                                         <th className="py-3 px-6 text-left">借款金額</th>
+                                                        <th className="py-3 px-6 text-left">淨額</th> {/* Added Net Profit */}
                                                         <th className="py-3 px-6 text-left">利率(%)</th>
                                                         <th className="py-3 px-6 text-left">還款方式</th>
                                                         <th className="py-3 px-6 text-left">期數</th>
@@ -1936,8 +2081,10 @@
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.date.substring(0, 10)}</td> {/* Only date part */}
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.clientName}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanAmount}</td>
+                                                            <td className={`py-3 px-6 text-left whitespace-nowrap ${calculateLoanNetProfit(record.id) !== null && typeof calculateLoanNetProfit(record.id) === 'number' && calculateLoanNetProfit(record.id) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                {calculateLoanNetProfit(record.id) !== null ? (typeof calculateLoanNetProfit(record.id) === 'number' ? calculateLoanNetProfit(record.id).toFixed(2) : calculateLoanNetProfit(record.id)) : '待計算'}
+                                                            </td> {/* Display Net Profit */}
                                                             <td className="py-3 px-6 text-left">{record.interestRate}</td>
-                                                            {/* Removed Interest Rate Period */}
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.repaymentMethod}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanTerm || 'N/A'}</td>
                                                             <td className="py-3 px-6 text-left">
@@ -1964,7 +2111,6 @@
                                                                     </span>
                                                                 )}
                                                             </td>
-                                                            {/* Removed Actual Return */}
                                                             <td className="py-3 px-6 text-left">
                                                                 <div className="flex space-x-2">
                                                                     <button
@@ -1980,6 +2126,20 @@
                                                                         disabled={loadingFirebase || !isAuthReady}
                                                                     >
                                                                         刪除
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { setEditingRecordId(record.id); setCurrentPage('cashFlowSummary'); }}
+                                                                        className="bg-purple-500 hover:bg-purple-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        disabled={loadingFirebase || !isAuthReady}
+                                                                    >
+                                                                        金流
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { setEditingRecordId(record.id); setShowEventHistoryModal(true); }}
+                                                                        className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        disabled={loadingFirebase || !isAuthReady}
+                                                                    >
+                                                                        事件
                                                                     </button>
                                                                 </div>
                                                             </td>
