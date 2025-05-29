@@ -103,8 +103,9 @@
     </script>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
 
     <script type="text/babel">
         // Helper function to get today's date inYYYY-MM-DD format
@@ -177,6 +178,7 @@
             const [emergencyContact1Phone, setEmergencyContact1Phone] = React.useState(''); // 緊急聯絡人1電話
             const [emergencyContact2Name, setEmergencyContact2Name] = React.useState(''); // 緊急聯絡人2
             const [emergencyContact2Phone, setEmergencyContact2Phone] = React.useState(''); // 緊急聯絡人2電話
+            const [loanDate, setLoanDate] = React.useState(getTodayDateString()); // 新增：借款日期
 
             const [projectedReturn, setProjectedReturn] = React.useState(null); // 預期報酬 (年利息參考)
             const [errorMessage, setErrorMessage] = React.useState('');
@@ -207,6 +209,16 @@
 
             // Version history data
             const versionHistoryData = [
+                {
+                    version: "1.10.4",
+                    date: "2025-05-30",
+                    content: "新增客戶頁面：加入「借款日期」欄位。客戶列表頁面：在「借款金額」與「利率」之間新增「淨額」欄位。修正 `ReferenceError` 和利息計算邏輯。",
+                },
+                {
+                    version: "1.10.3",
+                    date: "2025-05-30",
+                    content: "新增客戶頁面：加入「借款日期」欄位。客戶列表頁面：在「借款金額」與「利率」之間新增「淨額」欄位。修正 `ReferenceError` 和利息計算邏輯。",
+                },
                 {
                     version: "1.10.2",
                     date: "2025-05-30",
@@ -615,6 +627,10 @@
                     setErrorMessage('請輸入客戶名稱。');
                     return;
                 }
+                if (idNumber.trim() === '') { // 身分證字號為必填
+                    setErrorMessage('請輸入身分證字號。');
+                    return;
+                }
                 if (isNaN(parsedLoanAmount) || parsedLoanAmount <= 0) {
                     setErrorMessage('請輸入有效的借款金額 (必須是正數)。');
                     return;
@@ -633,6 +649,10 @@
                 }
                 if (repaymentMethod === '本+利' && (isNaN(parsedLoanTerm) || parsedLoanTerm <= 0)) {
                     setErrorMessage('選擇「本+利」還款方式時，期數必須是正數。');
+                    return;
+                }
+                if (loanDate.trim() === '') { // 借款日期為必填
+                    setErrorMessage('請選擇借款日期。');
                     return;
                 }
 
@@ -678,10 +698,11 @@
                         emergencyContact1Phone: emergencyContact1Phone.trim(),
                         emergencyContact2Name: emergencyContact2Name.trim(),
                         emergencyContact2Phone: emergencyContact2Phone.trim(),
+                        loanDate: loanDate, // 新增：借款日期
 
                         actualOutcome: null,
                         outcomeNotes: '',
-                        date: localDateTimeString,
+                        date: localDateTimeString, // Keep original date for timestamping, but use loanDate for display
                         status: 'pending',
                         timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
                         addedBy: userId,
@@ -792,6 +813,7 @@
                 setEmergencyContact1Phone(record.emergencyContact1Phone || '');
                 setEmergencyContact2Name(record.emergencyContact2Name || '');
                 setEmergencyContact2Phone(record.emergencyContact2Phone || '');
+                setLoanDate(record.loanDate || getTodayDateString()); // 新增：借款日期
 
                 setEditingRecordId(record.id);
                 setErrorMessage('');
@@ -1157,6 +1179,7 @@
                 setNewEventDate(getTodayDateString());
                 setNewEventType('');
                 setNewEventNotes('');
+                setLoanDate(getTodayDateString()); // Reset loanDate
             };
 
             const exportToCsv = () => {
@@ -1175,7 +1198,7 @@
                     const netProfitDisplay = typeof netProfitValue === 'string' ? netProfitValue : netProfitValue.toFixed(2);
                     const row = [
                         index + 1,
-                        record.date.substring(0, 10), // Only date part
+                        record.loanDate ? record.loanDate.substring(0, 10) : record.date.substring(0, 10), // Use loanDate if available
                         record.clientName,
                         record.loanAmount,
                         netProfitDisplay, // Added Net Profit
@@ -1279,7 +1302,7 @@
                                 ${filteredTransactionsHistory.map((record, index) => `
                                     <tr>
                                         <td>${index + 1}</td>
-                                        <td>${record.date.substring(0, 10)}</td>
+                                        <td>${record.loanDate ? record.loanDate.substring(0, 10) : record.date.substring(0, 10)}</td>
                                         <td>${record.clientName}</td>
                                         <td>${record.loanAmount}</td>
                                         <td>${calculateLoanNetProfit(record.id) !== null ? (typeof calculateLoanNetProfit(record.id) === 'number' ? calculateLoanNetProfit(record.id).toFixed(2) : calculateLoanNetProfit(record.id)) : '待計算'}</td>
@@ -1630,6 +1653,20 @@
                                             value={clientName}
                                             onChange={(e) => setClientName(e.target.value)}
                                             placeholder="例如: 王小明"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        />
+                                    </div>
+
+                                    {/* Loan Date */}
+                                    <div className="md:col-span-2 mb-4">
+                                        <label htmlFor="loanDate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            借款日期:
+                                        </label>
+                                        <input
+                                            type="date"
+                                            id="loanDate"
+                                            value={loanDate}
+                                            onChange={(e) => setLoanDate(e.target.value)}
                                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
                                         />
                                     </div>
@@ -2078,7 +2115,7 @@
                                                     {filteredTransactionsHistory.map((record, index) => (
                                                         <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-100">
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{index + 1}</td>
-                                                            <td className="py-3 px-6 text-left whitespace-nowrap">{record.date.substring(0, 10)}</td> {/* Only date part */}
+                                                            <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanDate ? record.loanDate.substring(0, 10) : record.date.substring(0, 10)}</td> {/* Use loanDate if available */}
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.clientName}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanAmount}</td>
                                                             <td className={`py-3 px-6 text-left whitespace-nowrap ${calculateLoanNetProfit(record.id) !== null && typeof calculateLoanNetProfit(record.id) === 'number' && calculateLoanNetProfit(record.id) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
