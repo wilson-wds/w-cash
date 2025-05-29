@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金融業客戶管理系統111</title>
+    <title>金融業客戶管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -11,6 +11,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <style>
         /* 您可以將自定義的 CSS 樣式放在這裡 */
         body { font-family: sans-serif; }
@@ -21,9 +22,9 @@
 
     <script type="text/babel">
         // =======================================================
-        // IMPORTANT: 請替換為您實際的 Firebase 專案配置資訊
+        // IMPORTANT: 已根據您提供的資訊更新 Firebase 專案配置資訊
         // =======================================================
-        const firebaseConfig = {
+         const firebaseConfig = {
             apiKey: "AIzaSyADSbeZr04Rxr0Al5jKVY1u5j9dnD2Bfx4", // Web API 密鑰
             authDomain: "wds-sport.firebaseapp.com", // 根據專案 ID 推斷
             projectId: "wds-sport", // 項目 ID
@@ -33,13 +34,13 @@
         };
 
         // =======================================================
-        // IMPORTANT: 請替換為您在 Canvas 環境中使用的 app ID
-        // 例如：'c_b8646627b6e8a431_crm-system-36'
+        // IMPORTANT: 已更新為您提供的 canvasAppId
         // =======================================================
-        const canvasAppId = "project-358067975632"; 
+        const canvasAppId = "3cdngTbCapcN5FIoyhMgXZrvuLf2"; 
 
         // =======================================================
         // IMPORTANT: 如果您有來自 Canvas 的自定義認證令牌，請替換此處。
+        // 對於本機測試，如果您只是想匿名登入，可以保持為 null。
         // =======================================================
         const initialAuthToken = null; 
 
@@ -121,16 +122,37 @@
             );
         };
 
-        const CustomerList = ({ customers, onAddBorrower, onEditBorrower, onDeleteBorrower, userId }) => {
-            console.log("CustomerList rendering. Customers data received:", customers.map(c => ({id: c.id, name: c.name, dis: c.disbursementTotal, rep: c.repaymentTotal}))); // Debug log
+        const CustomerList = ({ customers, onAddBorrower, onEditBorrower, onDeleteBorrower, userId, onGoogleSignIn, onSignOut, userName }) => {
+            console.log("CustomerList rendering. Customers data received:", customers.map(c => ({id: c.id, name: c.name, dis: c.disbursementTotal, rep: c.repaymentTotal})));
             return (
                 <div className="p-6 bg-gray-100 min-h-screen font-inter">
                     <div className="max-w-7xl mx-auto bg-white p-8 rounded-lg shadow-lg">
                         <div className="flex justify-between items-center mb-6">
                             <h1 className="text-3xl font-bold text-gray-800">客戶列表</h1>
-                            <button onClick={onAddBorrower} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 shadow-md">新增借款人</button>
+                            {userId ? (
+                                <div className="flex items-center space-x-4">
+                                    <span className="text-gray-700">您好, {userName || '用戶'}!</span>
+                                    <button
+                                        onClick={onSignOut}
+                                        className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition duration-300 shadow-md"
+                                    >
+                                        登出
+                                    </button>
+                                    <button onClick={onAddBorrower} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 shadow-md">新增借款人</button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={onGoogleSignIn}
+                                    className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 shadow-md flex items-center justify-center space-x-2"
+                                >
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12.24 10.21L12 10.22c-2.31 0-4.18 1.9-4.18 4.25s1.87 4.25 4.18 4.25c2.31 0 4.18-1.9 4.18-4.25s-1.87-4.25-4.18-4.25zm0-8.21c-2.31 0-4.18 1.9-4.18 4.25s1.87 4.25 4.18 4.25c2.31 0 4.18-1.9 4.18-4.25s-1.87-4.25-4.18-4.25zm0 16.42c-2.31 0-4.18 1.9-4.18 4.25s1.87 4.25 4.18 4.25c2.31 0 4.18-1.9 4.18-4.25s-1.87-4.25-4.18-4.25zM23.99 12c0-6.63-5.37-12-12-12s-12 5.37-12 12 5.37 12 12 12 12-5.37 12-12zM12 21.99c-5.52 0-9.99-4.47-9.99-9.99s4.47-9.99 9.99-9.99 9.99 4.47 9.99 9.99-4.47 9.99-9.99 9.99z"/>
+                                    </svg>
+                                    <span>使用 Google 登入</span>
+                                </button>
+                            )}
                         </div>
-                        <div className="mb-4 text-sm text-gray-600">您的用戶 ID: <span className="font-mono bg-gray-200 px-2 py-1 rounded">{userId}</span></div>
+                        <div className="mb-4 text-sm text-gray-600">您的用戶 ID: <span className="font-mono bg-gray-200 px-2 py-1 rounded">{userId || '未登入'}</span></div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full bg-white border border-gray-200 rounded-lg">
                                 <thead className="bg-gray-50">
@@ -282,7 +304,7 @@
                     else if (newEntry.type === '還款') { currentRepayment += parseFloat(newEntry.amount); }
                     await customerDocRef.set({ disbursementTotal: currentDisbursement, repaymentTotal: currentRepayment, }, { merge: true });
 
-                    console.log(`CashFlowModal: Updated customer ${customer.id} totals in Firestore: Disbursement=${currentDisbursement}, Repayment=${currentRepayment}`); // Debug log
+                    console.log(`CashFlowModal: Updated customer ${customer.id} totals in Firestore: Disbursement=${currentDisbursement}, Repayment=${currentRepayment}`);
                     setNewEntry({ type: '還款', date: new Date().toISOString().slice(0, 10), amount: '', category: '本金還款', remarks: '', });
                 } catch (error) {
                     console.error("Error adding cash flow:", error);
@@ -308,7 +330,7 @@
                     if (cashFlowEntryToDelete.type === '出款') { currentDisbursement -= cashFlowEntryToDelete.amount; }
                     else if (cashFlowEntryToDelete.type === '還款') { currentRepayment -= cashFlowEntryToDelete.amount; }
                     await customerDocRef.set({ disbursementTotal: currentDisbursement, repaymentTotal: currentRepayment, }, { merge: true });
-                    console.log(`CashFlowModal: Updated customer ${customer.id} totals in Firestore after delete: Disbursement=${currentDisbursement}, Repayment=${currentRepayment}`); // Debug log
+                    console.log(`CashFlowModal: Updated customer ${customer.id} totals in Firestore after delete: Disbursement=${currentDisbursement}, Repayment=${currentRepayment}`);
                 } catch (error) {
                     console.error("Error deleting cash flow:", error);
                     let errorMessage = '刪除金流失敗。';
@@ -389,17 +411,35 @@
             const [selectedCustomerForCashFlow, setSelectedCustomerForCashFlow] = React.useState(null);
             const [showDeleteConfirmModal, setShowDeleteConfirmModal] = React.useState(false);
             const [itemToDelete, setItemToDelete] = React.useState(null);
+            const [userName, setUserName] = React.useState(''); // State to store user's display name
 
             React.useEffect(() => {
                 const unsubscribeAuth = firebase.auth().onAuthStateChanged(async (user) => {
-                    if (!user) {
+                    if (user) {
+                        // User is signed in.
+                        setCurrentUserId(user.uid);
+                        setUserName(user.displayName || user.email || '用戶'); // Set display name
+                        setIsAuthReady(true);
+                    } else {
+                        // No user is signed in. Attempt anonymous sign-in or wait for Google sign-in.
                         try {
-                            if (initialAuthToken) { await firebase.auth().signInWithCustomToken(initialAuthToken); }
-                            else { await firebase.auth().signInAnonymously(); }
-                        } catch (error) { console.error("Firebase authentication failed:", error); }
+                            if (initialAuthToken) {
+                                await firebase.auth().signInWithCustomToken(initialAuthToken);
+                            } else {
+                                // Only sign in anonymously if there's no initialAuthToken and no user
+                                // This prevents automatic anonymous sign-in if user intends to use Google sign-in
+                                // and hasn't clicked the button yet.
+                                // For this example, we'll let the Google button handle explicit sign-in.
+                                // If you want anonymous fallback, uncomment the line below:
+                                // await firebase.auth().signInAnonymously();
+                            }
+                        } catch (error) {
+                            console.error("Firebase authentication failed:", error);
+                        }
+                        setCurrentUserId(null); // Ensure userId is null if not authenticated
+                        setUserName('');
+                        setIsAuthReady(true);
                     }
-                    setCurrentUserId(firebase.auth().currentUser?.uid || crypto.randomUUID());
-                    setIsAuthReady(true);
                 });
                 return () => unsubscribeAuth();
             }, []);
@@ -423,20 +463,45 @@
                         console.log("App's onSnapshot updated customers state. New customer data:", customerData.map(c => ({id: c.id, name: c.name, dis: c.disbursementTotal, rep: c.repaymentTotal})));
                     }, (error) => { console.error("Error fetching customers:", error); });
                     return () => unsubscribe();
+                } else if (isAuthReady && !currentUserId) {
+                    // Clear customers if user logs out or is not authenticated
+                    setCustomers([]);
+                    setEditingCustomer(null);
                 }
             }, [isAuthReady, currentUserId, editingCustomer]);
+
+            const handleGoogleSignIn = async () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                try {
+                    await firebase.auth().signInWithPopup(provider);
+                    // onAuthStateChanged will handle updating the user state
+                } catch (error) {
+                    console.error("Google Sign-In failed:", error);
+                    alert(`Google 登入失敗: ${error.message}`); // Use alert for simplicity in HTML version
+                }
+            };
+
+            const handleSignOut = async () => {
+                try {
+                    await firebase.auth().signOut();
+                    // onAuthStateChanged will handle updating the user state
+                } catch (error) {
+                    console.error("Sign Out failed:", error);
+                    alert(`登出失敗: ${error.message}`); // Use alert for simplicity in HTML version
+                }
+            };
 
             const handleAddBorrower = () => { setCurrentPage('form'); setEditingCustomer(null); };
             const handleEditBorrower = (customer) => { setCurrentPage('form'); setEditingCustomer(customer); };
             const handleSaveBorrower = async (borrowerData) => {
-                if (!currentUserId) { console.error("User ID not available. Cannot save data."); return; }
+                if (!currentUserId) { console.error("User ID not available. Cannot save data."); alert("請先登入才能儲存資料。"); return; }
                 try {
                     let customerDocRef; let newCustomerId = borrowerData.id;
                     if (borrowerData.id) { customerDocRef = firebase.firestore().doc(`artifacts/${canvasAppId}/users/${currentUserId}/customers/${borrowerData.id}`); }
                     else { customerDocRef = firebase.firestore().collection(`artifacts/${canvasAppId}/users/${currentUserId}/customers`).doc(); newCustomerId = customerDocRef.id; }
                     await customerDocRef.set({ ...borrowerData, id: newCustomerId }, { merge: true });
                     setCurrentPage('list'); console.log("App: handleSaveBorrower completed. Data saved to Firestore.");
-                } catch (error) { console.error("Error saving borrower:", error); }
+                } catch (error) { console.error("Error saving borrower:", error); alert(`儲存失敗: ${error.message}`); }
             };
 
             const handleDeleteBorrower = (id) => {
@@ -444,16 +509,19 @@
                 if (customerToDelete) { setItemToDelete({ type: 'borrower', id: id, name: customerToDelete.name }); setShowDeleteConfirmModal(true); }
             };
             const confirmDeleteAction = async () => {
-                if (!currentUserId || !itemToDelete) { console.error("User ID or item to delete not available."); return; }
+                if (!currentUserId || !itemToDelete) { console.error("User ID or item to delete not available."); alert("請先登入才能刪除資料。"); return; }
                 try {
                     if (itemToDelete.type === 'borrower') { await firebase.firestore().doc(`artifacts/${canvasAppId}/users/${currentUserId}/customers/${itemToDelete.id}`).delete(); console.log("App: Borrower deleted from Firestore:", itemToDelete.id); }
-                } catch (error) { console.error("Error during deletion:", error); }
+                } catch (error) { console.error("Error during deletion:", error); alert(`刪除失敗: ${error.message}`); }
                 finally { setShowDeleteConfirmModal(false); setItemToDelete(null); }
             };
             const cancelDeleteAction = () => { setShowDeleteConfirmModal(false); setItemToDelete(null); };
 
             const handleCancel = () => { setCurrentPage('list'); setEditingCustomer(null); };
-            const handleViewCashFlow = (customer) => { setSelectedCustomerForCashFlow(customer); setShowCashFlowModal(true); console.log("App: Opening CashFlowModal for customer:", customer.id, "Current totals:", customer.disbursementTotal, customer.repaymentTotal); };
+            const handleViewCashFlow = (customer) => {
+                if (!currentUserId) { alert("請先登入才能查看金流。"); return; }
+                setSelectedCustomerForCashFlow(customer); setShowCashFlowModal(true); console.log("App: Opening CashFlowModal for customer:", customer.id, "Current totals:", customer.disbursementTotal, customer.repaymentTotal);
+            };
             const handleCloseCashFlowModal = () => { setShowCashFlowModal(false); setSelectedCustomerForCashFlow(null); console.log("App: Closing CashFlowModal."); };
 
             if (!isAuthReady) { return (<div className="flex items-center justify-center min-h-screen bg-gray-100"><div className="text-xl text-gray-700">載入中...</div></div>); }
@@ -461,7 +529,16 @@
             return (
                 <div className="App">
                     {currentPage === 'list' ? (
-                        <CustomerList customers={customers} onAddBorrower={handleAddBorrower} onEditBorrower={handleEditBorrower} onDeleteBorrower={handleDeleteBorrower} userId={currentUserId}/>
+                        <CustomerList
+                            customers={customers}
+                            onAddBorrower={handleAddBorrower}
+                            onEditBorrower={handleEditBorrower}
+                            onDeleteBorrower={handleDeleteBorrower}
+                            userId={currentUserId}
+                            onGoogleSignIn={handleGoogleSignIn}
+                            onSignOut={handleSignOut}
+                            userName={userName}
+                        />
                     ) : (
                         <BorrowerForm customer={editingCustomer} onSave={handleSaveBorrower} onCancel={handleCancel} onViewCashFlow={handleViewCashFlow}/>
                     )}
