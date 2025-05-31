@@ -42,11 +42,13 @@
     <div id="root"></div>
 
     <script type="module">
+        // Import Firebase modules from CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose Firebase services to the window object for React to access
+        // This is necessary because React is loaded via UMD, not as a module.
         window.firebase = {
             initializeApp,
             getAuth,
@@ -108,7 +110,7 @@
 
 
     <script type="text/babel">
-        // Helper function to get today's date inYYYY-MM-DD format
+        // Helper function to get today's date in YYYY-MM-DD format
         const getTodayDateString = () => {
             const today = new Date();
             const year = today.getFullYear();
@@ -117,7 +119,7 @@
             return `${year}-${month}-${day}`;
         };
 
-        // CRM-specific advice messages
+        // CRM-specific advice messages (Not currently used in the UI, but good for future expansion)
         const transactionSuccessAdvice = [
             "恭喜！客戶滿意度是您最大的資產。",
             "持續為客戶創造價值，建立長期信任關係。",
@@ -143,6 +145,7 @@
         ];
 
         function FinancialCRM() {
+            // State variables for Firebase and authentication
             const [db, setDb] = React.useState(null);
             const [auth, setAuth] = React.useState(null);
             const [userId, setUserId] = React.useState(null);
@@ -151,7 +154,7 @@
             const [isAuthReady, setIsAuthReady] = React.useState(false);
             const [loadingFirebase, setLoadingFirebase] = React.useState(true);
 
-            // Client and Transaction input states
+            // State variables for client and transaction input fields
             const [clientName, setClientName] = React.useState('');
             const [loanAmount, setLoanAmount] = React.useState(''); // 借款金額
             const [interestRate, setInterestRate] = React.useState(''); // 利率
@@ -182,15 +185,21 @@
 
             const [projectedReturn, setProjectedReturn] = React.useState(null); // 預期報酬 (年利息參考)
             const [errorMessage, setErrorMessage] = React.useState('');
-            const [transactionsHistory, setTransactionsHistory] = React.useState([]);
+            const [transactionsHistory, setTransactionsHistory] = React.useState([]); // All client transactions
 
             // Cash Flow states for the current transaction
             const [cashFlows, setCashFlows] = React.useState([]); // 金流紀錄列表
-            const [newCashFlowType, setNewCashFlowType] = React.useState('出款'); // 金流類型
+            // Removed newCashFlowType state and its dropdown/custom input
             const [newCashFlowDate, setNewCashFlowDate] = React.useState(getTodayDateString()); // 金流日期
             const [newCashFlowAmount, setNewCashFlowAmount] = React.useState(''); // 金流金額
             const [newCashFlowItem, setNewCashFlowItem] = React.useState('本金+利息'); // 金流名目
             const [newCashFlowNotes, setNewCashFlowNotes] = React.useState(''); // 金流備註
+
+            // State for custom cash flow items (type is now inferred from amount)
+            const [customCashFlowItemInput, setCustomCashFlowItemInput] = React.useState('');
+            // Kept managedCashFlowTypes for consistency in Firestore, but it's not used in UI for new entry
+            const [managedCashFlowTypes, setManagedCashFlowTypes] = React.useState(['出款', '還款']);
+            const [managedCashFlowItems, setManagedCashFlowItems] = React.useState(['本金+利息', '本金', '利息', '其他']); // 金流名目
 
             // Event History states for the current transaction
             const [eventHistoryRecords, setEventHistoryRecords] = React.useState([]); // 事件紀錄列表
@@ -202,13 +211,28 @@
             // Modals and editing states
             const [showConfirmDeleteDialog, setShowConfirmDeleteDialog] = React.useState(false);
             const [recordToDelete, setRecordToDelete] = React.useState(null);
-            const [editingRecordId, setEditingRecordId] = React.useState(null);
+            const [editingRecordId, setEditingRecordId] = React.useState(null); // ID of the transaction being edited or viewed for cash flow/events
 
             // Page navigation state
             const [currentPage, setCurrentPage] = React.useState('clientList'); // 'clientList', 'addClient', 'cashFlowSummary', 'eventHistory'
 
-            // Version history data
+            // Version history data for the update log modal
             const versionHistoryData = [
+                {
+                    version: "1.12.0",
+                    date: "2025-06-01",
+                    content: "金流紀錄列表排序改為日期升序（最後輸入的項目在最下方）。新增金流紀錄頁面：移除「類型」下拉式選單，類型依金額正負自動判斷；「名目」保留自訂功能。客戶列表下方新增年月份篩選器，篩選客戶交易紀錄並更新統計數據。",
+                },
+                {
+                    version: "1.11.1",
+                    date: "2025-06-01",
+                    content: "修正 `managedRepaymentMethods` 未定義的錯誤。金流紀錄列表排序改為最後輸入的項目在最下方。新增金流紀錄頁面：類型與名目新增可自行輸入的欄位。客戶列表下方新增年月份篩選與現金流量概覽。",
+                },
+                {
+                    version: "1.11.0",
+                    date: "2025-06-01",
+                    content: "金流紀錄列表排序改為最後輸入的項目在最下方。新增金流紀錄頁面：類型與名目新增可自行輸入的欄位。客戶列表下方新增年月份篩選與現金流量概覽。",
+                },
                 {
                     version: "1.10.4",
                     date: "2025-05-30",
@@ -342,16 +366,28 @@
             // Fixed options for dropdowns
             const [managedInterestRatePeriods, setManagedInterestRatePeriods] = React.useState(['年', '月', '日']);
             const [managedRepaymentMethods, setManagedRepaymentMethods] = React.useState(['本+利', '純繳利息']);
-            const [managedCashFlowTypes, setManagedCashFlowTypes] = React.useState(['出款', '還款']); // 金流類型
-            const [managedCashFlowItems, setManagedCashFlowItems] = React.useState(['本金+利息', '本金', '利息', '其他']); // 金流名目
             const [managedOutcomeTypes, setManagedOutcomeTypes] = React.useState([]); // For settings modal, if custom outcomes are still desired
             const [newOutcomeTypeInput, setNewOutcomeTypeInput] = React.useState('');
+
+            // State for monthly/yearly summary filter
+            const currentYear = new Date().getFullYear();
+            const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i); // Current year and past 4 years
+            const monthOptions = [
+                { value: 'all', label: '全部月份' },
+                { value: '01', label: '1月' }, { value: '02', label: '2月' }, { value: '03', label: '3月' },
+                { value: '04', label: '4月' }, { value: '05', label: '5月' }, { value: '06', label: '6月' },
+                { value: '07', label: '7月' }, { value: '08', label: '8月' }, { value: '09', label: '9月' },
+                { value: '10', label: '10月' }, { value: '11', label: '11月' }, { value: '12', label: '12月' },
+            ];
+            const [selectedSummaryYear, setSelectedSummaryYear] = React.useState('all');
+            const [selectedSummaryMonth, setSelectedSummaryMonth] = React.useState('all');
 
 
             // --- Firebase Initialization and Authentication ---
             React.useEffect(() => {
                 const initializeFirebase = async () => {
                     try {
+                        // Parse Firebase config from global variable
                         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
                         const app = window.firebase.initializeApp(firebaseConfig);
                         const authInstance = window.firebase.getAuth(app);
@@ -362,13 +398,16 @@
 
                         console.log("Firebase Config:", firebaseConfig);
 
+                        // Listen for authentication state changes
                         const unsubscribe = window.firebase.onAuthStateChanged(authInstance, async (user) => {
                             if (user) {
+                                // User is signed in
                                 setUserId(user.uid);
                                 setUserName(user.displayName || user.email || '匿名用戶');
                                 setUserEmail(user.email);
                                 console.log("User signed in:", user.uid);
                             } else {
+                                // User is signed out, attempt anonymous or custom token sign-in
                                 try {
                                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== '') {
                                         await window.firebase.signInWithCustomToken(authInstance, __initial_auth_token);
@@ -382,11 +421,11 @@
                                     setErrorMessage("匿名登入失敗，請檢查 Firebase 認證設定或 API 金鑰。");
                                 }
                             }
-                            setIsAuthReady(true);
-                            setLoadingFirebase(false);
+                            setIsAuthReady(true); // Mark authentication as ready
+                            setLoadingFirebase(false); // End loading state
                         });
 
-                        return () => unsubscribe();
+                        return () => unsubscribe(); // Cleanup auth listener on component unmount
                     } catch (error) {
                         console.error("Firebase initialization failed:", error);
                         setErrorMessage("Firebase 初始化失敗，請檢查設定。");
@@ -395,46 +434,93 @@
                 };
 
                 initializeFirebase();
-            }, []);
+            }, []); // Empty dependency array means this effect runs once on mount
 
             // --- Load managed outcome types from Firestore (for settings modal) ---
             React.useEffect(() => {
+                // Ensure db, auth, and userId are available before attempting to fetch
                 if (!db || !isAuthReady || !userId) return;
 
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                // Construct the Firestore collection reference for outcome types
                 const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
 
+                // Set up real-time listener for outcome types
                 const unsubscribeOutcomeTypes = window.firebase.onSnapshot(outcomeTypesRef, (snapshot) => {
-                    const types = snapshot.docs.map(doc => doc.id);
-                    setManagedOutcomeTypes(types.sort());
+                    const types = snapshot.docs.map(doc => doc.id); // Get document IDs as types
+                    setManagedOutcomeTypes(types.sort()); // Sort and set the types
                 }, (error) => {
                     console.error("Error fetching outcome types:", error);
                 });
 
                 return () => {
-                    unsubscribeOutcomeTypes();
+                    unsubscribeOutcomeTypes(); // Cleanup listener on component unmount or dependencies change
                 };
+            }, [db, isAuthReady, userId]); // Re-run if db, auth readiness, or userId changes
+
+            // --- Load managed cash flow types from Firestore ---
+            React.useEffect(() => {
+                if (!db || !isAuthReady || !userId) return;
+
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const cashFlowTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/cashFlowTypes`);
+
+                const unsubscribeCashFlowTypes = window.firebase.onSnapshot(cashFlowTypesRef, (snapshot) => {
+                    const types = snapshot.docs.map(doc => doc.id);
+                    // Add default types if they are not already present
+                    const defaultTypes = ['出款', '還款'];
+                    const combinedTypes = [...new Set([...defaultTypes, ...types])]; // Use Set to ensure uniqueness
+                    setManagedCashFlowTypes(combinedTypes.sort());
+                }, (error) => {
+                    console.error("Error fetching cash flow types:", error);
+                });
+
+                return () => unsubscribeCashFlowTypes();
+            }, [db, isAuthReady, userId]);
+
+            // --- Load managed cash flow items from Firestore ---
+            React.useEffect(() => {
+                if (!db || !isAuthReady || !userId) return;
+
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const cashFlowItemsRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/cashFlowItems`);
+
+                const unsubscribeCashFlowItems = window.firebase.onSnapshot(cashFlowItemsRef, (snapshot) => {
+                    const items = snapshot.docs.map(doc => doc.id);
+                    // Add default items if they are not already present
+                    const defaultItems = ['本金+利息', '本金', '利息', '其他'];
+                    const combinedItems = [...new Set([...defaultItems, ...items])]; // Use Set to ensure uniqueness
+                    setManagedCashFlowItems(combinedItems.sort());
+                }, (error) => {
+                    console.error("Error fetching cash flow items:", error);
+                });
+
+                return () => unsubscribeCashFlowItems();
             }, [db, isAuthReady, userId]);
 
             // --- Load cash flow records for the currently edited transaction ---
             React.useEffect(() => {
+                // Only fetch if db, auth is ready, a user is logged in, a record is being edited, and on the cash flow summary page
                 if (!db || !isAuthReady || !userId || !editingRecordId || currentPage !== 'cashFlowSummary') {
-                    setCashFlows([]); // Clear cash flows if not editing or not on cash flow page
+                    setCashFlows([]); // Clear cash flows if conditions are not met
                     return;
                 }
 
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                // Construct the Firestore collection reference for cash flows of the specific transaction
                 const cashFlowsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/cashFlows`);
 
+                // Set up real-time listener for cash flow records
                 const unsubscribeCashFlows = window.firebase.onSnapshot(cashFlowsCollectionRef, (snapshot) => {
                     const records = [];
                     snapshot.forEach(doc => {
                         records.push({ id: doc.id, ...doc.data() });
                     });
+                    // Sort cash flow records by date (oldest first) - last entered item at the bottom
                     records.sort((a, b) => {
                         const dateA = new Date(a.date.replace(/-/g, '/')).getTime();
                         const dateB = new Date(b.date.replace(/-/g, '/')).getTime();
-                        return dateB - dateA; // Newest first
+                        return dateA - dateB; // Oldest first (ascending order)
                     });
                     setCashFlows(records);
                 }, (error) => {
@@ -442,24 +528,28 @@
                     setErrorMessage("無法載入金流紀錄。");
                 });
 
-                return () => unsubscribeCashFlows();
+                return () => unsubscribeCashFlows(); // Cleanup listener
             }, [db, isAuthReady, userId, editingRecordId, currentPage]); // Re-fetch when editingRecordId or currentPage changes
 
             // --- Load event history records for the currently edited transaction ---
             React.useEffect(() => {
+                // Only fetch if db, auth is ready, a user is logged in, a record is being edited, and the event history modal is open
                 if (!db || !isAuthReady || !userId || !editingRecordId || !showEventHistoryModal) {
-                    setEventHistoryRecords([]);
+                    setEventHistoryRecords([]); // Clear event history if conditions are not met
                     return;
                 }
 
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                // Construct the Firestore collection reference for event history of the specific transaction
                 const eventsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/events`);
 
+                // Set up real-time listener for event history records
                 const unsubscribeEvents = window.firebase.onSnapshot(eventsCollectionRef, (snapshot) => {
                     const records = [];
                     snapshot.forEach(doc => {
                         records.push({ id: doc.id, ...doc.data() });
                     });
+                    // Sort event history records by date (newest first)
                     records.sort((a, b) => {
                         const dateA = new Date(a.date.replace(/-/g, '/')).getTime();
                         const dateB = new Date(b.date.replace(/-/g, '/')).getTime();
@@ -471,10 +561,11 @@
                     setErrorMessage("無法載入事件紀錄。");
                 });
 
-                return () => unsubscribeEvents();
+                return () => unsubscribeEvents(); // Cleanup listener
             }, [db, isAuthReady, userId, editingRecordId, showEventHistoryModal]);
 
 
+            // Handles Google Sign-In
             const handleGoogleSignIn = async () => {
                 setErrorMessage('');
                 if (!auth) {
@@ -498,6 +589,7 @@
                 }
             };
 
+            // Handles user sign-out
             const handleSignOut = async () => {
                 setErrorMessage('');
                 if (!auth) {
@@ -509,16 +601,18 @@
                     setUserId(null);
                     setUserName(null);
                     setUserEmail(null);
-                    setTransactionsHistory([]);
+                    setTransactionsHistory([]); // Clear history on sign out
                 } catch (error) {
                     console.error("Sign Out failed:", error);
                     setErrorMessage("登出失敗。");
                 }
             };
 
-            // --- Load transactions history from Firestore ---
+            // --- Load all client transactions history from Firestore ---
             React.useEffect(() => {
+                // Ensure db, auth is ready, and userId is available before attempting to fetch
                 if (!db || !isAuthReady || !userId) {
+                    // If not ready or signed out, clear transactions history
                     if (transactionsHistory.length > 0) {
                         setTransactionsHistory([]);
                     }
@@ -528,16 +622,19 @@
                 let unsubscribe;
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Construct the Firestore collection reference for all user transactions
                     const transactionsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions`);
 
+                    // Set up real-time listener for transactions
                     unsubscribe = window.firebase.onSnapshot(transactionsCollectionRef, (snapshot) => {
                         const records = [];
                         snapshot.forEach(doc => {
                             records.push({ id: doc.id, ...doc.data() });
                         });
+                        // Sort transactions by timestamp (newest first)
                         records.sort((a, b) => {
-                            const timeA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate().getTime() : a.timestamp) : a.id;
-                            const timeB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate().getTime() : b.timestamp) : b.id;
+                            const timeA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate().getTime() : a.timestamp) : 0;
+                            const timeB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate().getTime() : b.timestamp) : 0;
                             return timeB - timeA; // Newest first
                         });
                         setTransactionsHistory(records);
@@ -552,11 +649,11 @@
                 }
 
                 return () => {
-                    if (unsubscribe) unsubscribe();
+                    if (unsubscribe) unsubscribe(); // Cleanup listener on component unmount or dependencies change
                 };
-            }, [db, isAuthReady, userId]);
+            }, [db, isAuthReady, userId]); // Re-run if db, auth readiness, or userId changes
 
-            // Calculate projected return (年利息參考)
+            // Calculate projected return (年利息參考) based on loan amount, interest rate, and period
             const calculateProjectedReturn = React.useCallback(() => {
                 const parsedLoanAmount = parseFloat(loanAmount);
                 const parsedInterestRate = parseFloat(interestRate);
@@ -565,64 +662,66 @@
                     setProjectedReturn(null);
                 } else {
                     let interestForPeriod;
+                    // The interest rate is assumed to be the rate for the selected period (annual, monthly, or daily)
                     switch (interestRatePeriod) {
                         case '年':
                             interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100);
                             break;
                         case '月':
-                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100); // Corrected: no division by 12 if rate is already monthly
+                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100);
                             break;
                         case '日':
-                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100); // Corrected: no division by 365 if rate is already daily
+                            interestForPeriod = parsedLoanAmount * (parsedInterestRate / 100);
                             break;
                         default:
                             interestForPeriod = 0;
                     }
                     setProjectedReturn(interestForPeriod.toFixed(2));
                 }
-            }, [loanAmount, interestRate, interestRatePeriod]); // interestRatePeriod is now a crucial dependency for the label
+            }, [loanAmount, interestRate, interestRatePeriod]);
 
+            // Recalculate projected return whenever relevant inputs change
             React.useEffect(() => {
                 calculateProjectedReturn();
             }, [loanAmount, interestRate, interestRatePeriod, calculateProjectedReturn]);
 
-            // Calculate Amount Due Per Period (PMT)
+            // Calculate Amount Due Per Period (PMT) for amortized loans or simple interest for interest-only loans
             const calculateAmountDuePerPeriod = React.useCallback((amount, rate, term, periodType, repaymentMethodType) => {
-                const P = parseFloat(amount);
-                let i = parseFloat(rate) / 100; // Convert percentage to decimal. This 'i' is the rate for the specified periodType
-                let n = parseInt(term, 10);
+                const P = parseFloat(amount); // Principal amount
+                let i = parseFloat(rate) / 100; // Interest rate per period (as decimal)
+                let n = parseInt(term, 10); // Number of periods
 
                 if (isNaN(P) || P <= 0 || isNaN(i) || i < 0 || (repaymentMethodType === '本+利' && (isNaN(n) || n <= 0))) {
-                    return null; // Invalid inputs
+                    return null; // Return null for invalid inputs
                 }
 
-                // No adjustment to 'i' needed here based on periodType, as 'rate' is assumed to be the rate for 'periodType'
-                // The 'periodType' is only relevant for the interpretation of 'rate' and 'term' units.
-
                 if (repaymentMethodType === '純繳利息') {
-                    return (P * i).toFixed(2); // Only interest payment for one period
+                    return (P * i).toFixed(2); // For interest-only repayment, payment is just interest for one period
                 } else if (repaymentMethodType === '本+利') {
                     if (i === 0) {
-                        return (P / n).toFixed(2); // Simple division if no interest
+                        return (P / n).toFixed(2); // If interest is zero, simple principal division
                     }
-                    // Amortized loan payment formula
+                    // Amortized loan payment formula (PMT)
                     const payment = P * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
                     return payment.toFixed(2);
                 }
-                return null;
+                return null; // Should not reach here
             }, []);
 
+            // Handles saving or updating a client/loan record
             const handleSaveRecordButtonClick = async () => {
-                setErrorMessage('');
+                setErrorMessage(''); // Clear previous error messages
                 if (!db || !userId) {
                     setErrorMessage("資料庫未準備好或未登入。請先登入。");
                     return;
                 }
 
+                // Parse numerical inputs
                 const parsedLoanAmount = parseFloat(loanAmount);
                 const parsedInterestRate = parseFloat(interestRate);
                 const parsedLoanTerm = parseInt(loanTerm, 10);
 
+                // Input validation
                 if (clientName.trim() === '') {
                     setErrorMessage('請輸入客戶名稱。');
                     return;
@@ -656,6 +755,7 @@
                     return;
                 }
 
+                // Get current local date and time for timestamping
                 const now = new Date();
                 const localDateTimeString = now.toLocaleString('zh-TW', {
                     year: 'numeric',
@@ -668,26 +768,28 @@
 
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the main transactions collection
                     const transactionsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions`);
-                    // Define outcomeTypesRef here to be in scope
+                    // Reference to the outcome types for default creation if not exists
                     const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
 
+                    // Data object for the transaction record
                     const recordData = {
                         clientName: clientName.trim(),
-                        loanAmount: parsedLoanAmount, // 借款金額
-                        interestRate: parsedInterestRate, // 利率
-                        interestRatePeriod: interestRatePeriod.trim(), // 利率週期
-                        repaymentMethod: repaymentMethod.trim(), // 還款方式
-                        loanTerm: repaymentMethod === '本+利' ? parsedLoanTerm : null, // 期數
+                        loanAmount: parsedLoanAmount,
+                        interestRate: parsedInterestRate,
+                        interestRatePeriod: interestRatePeriod.trim(),
+                        repaymentMethod: repaymentMethod.trim(),
+                        loanTerm: repaymentMethod === '本+利' ? parsedLoanTerm : null, // Only save loanTerm if repayment is '本+利'
                         notes: notes.trim(),
                         // New client detail fields
                         contactMethod: contactMethod.trim(),
-                        homePhone: homePhone.trim(), // 新增
-                        lineId: lineId.trim(), // 新增
-                        facebook: facebook.trim(), // 新增
-                        instagram: instagram.trim(), // 新增
-                        idNumber: idNumber.trim(), // 新增
-                        birthday: birthday.trim(), // 新增
+                        homePhone: homePhone.trim(),
+                        lineId: lineId.trim(),
+                        facebook: facebook.trim(),
+                        instagram: instagram.trim(),
+                        idNumber: idNumber.trim(),
+                        birthday: birthday.trim(),
                         address: address.trim(),
                         residentialArea: residentialArea.trim(),
                         occupation: occupation.trim(),
@@ -698,28 +800,30 @@
                         emergencyContact1Phone: emergencyContact1Phone.trim(),
                         emergencyContact2Name: emergencyContact2Name.trim(),
                         emergencyContact2Phone: emergencyContact2Phone.trim(),
-                        loanDate: loanDate, // 新增：借款日期
-
-                        actualOutcome: null,
-                        outcomeNotes: '',
-                        date: localDateTimeString, // Keep original date for timestamping, but use loanDate for display
-                        status: 'pending',
-                        timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
-                        addedBy: userId,
-                        actualProfit: null, // Initialize actualProfit for new records
+                        loanDate: loanDate, // New: Loan Date field
+                        actualOutcome: null, // Outcome status (e.g., '成交', '失敗', '待定')
+                        outcomeNotes: '', // Notes related to the outcome
+                        date: localDateTimeString, // Timestamp of record creation/update
+                        status: 'pending', // Initial status
+                        timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(), // Firestore server timestamp
+                        addedBy: userId, // User who added the record
+                        actualProfit: null, // Initialize actualProfit for new records, will be calculated from cash flows
                     };
 
                     if (editingRecordId) {
+                        // Update existing record
                         const docRef = window.firebase.doc(transactionsCollectionRef, editingRecordId);
                         await window.firebase.updateDoc(docRef, recordData);
                         setErrorMessage("紀錄已成功更新。");
-                        setEditingRecordId(null);
+                        setEditingRecordId(null); // Clear editing state
                     } else {
+                        // Add new record
                         await window.firebase.addDoc(transactionsCollectionRef, recordData);
                         setErrorMessage("新增紀錄成功。");
                     }
 
-                    // Default outcome types if not already present
+                    // Ensure default outcome types exist in Firestore for the current user
+                    // This creates them if they don't already exist
                     if (!managedOutcomeTypes.includes('成交')) {
                         await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '成交'), { exists: true });
                     }
@@ -730,14 +834,15 @@
                         await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '待定'), { exists: true });
                     }
 
-                    resetFields();
-                    setCurrentPage('clientList'); // After saving, return to client list
+                    resetFields(); // Clear form fields
+                    setCurrentPage('clientList'); // After saving, return to client list view
                 } catch (error) {
                     console.error("Error saving document:", error);
                     setErrorMessage("儲存紀錄失敗。");
                 }
             };
 
+            // Updates the status of a transaction (e.g., '成交', '失敗')
             const updateTransactionStatus = async (id, newStatus, outcomeNotes = '') => {
                 setErrorMessage('');
                 if (!db || !userId) {
@@ -752,7 +857,7 @@
                     if (docSnap.exists()) {
                         let calculatedActualProfit = 0; // Initialize to 0 for calculation
 
-                        // Fetch cash flows for this specific transaction to calculate actual profit
+                        // Fetch all cash flows for this specific transaction to calculate its actual profit
                         const cashFlowsForThisLoanRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions/${id}/cashFlows`);
                         const cashFlowsSnapshot = await window.firebase.getDocs(cashFlowsForThisLoanRef);
                         let totalIncomingForLoan = 0;
@@ -766,9 +871,10 @@
                             }
                         });
 
-                        // Calculate actual profit based on cash flows
+                        // Calculate actual profit based on cash flows (Incoming - Outgoing)
                         calculatedActualProfit = totalIncomingForLoan - totalOutgoingForLoan;
 
+                        // Update the main transaction document with the new status and calculated profit
                         await window.firebase.updateDoc(docRef, {
                             actualOutcome: newStatus,
                             actualProfit: calculatedActualProfit, // Store the calculated net profit
@@ -787,6 +893,7 @@
                 }
             };
 
+            // Populates the form fields with data from a selected record for editing
             const handleEditRecord = (record) => {
                 setClientName(record.clientName);
                 setLoanAmount(record.loanAmount.toString());
@@ -795,14 +902,14 @@
                 setRepaymentMethod(record.repaymentMethod || '本+利');
                 setLoanTerm(record.loanTerm ? record.loanTerm.toString() : '');
                 setNotes(record.notes || '');
-                // Set new fields for editing
+                // Set new client detail fields for editing
                 setContactMethod(record.contactMethod || '');
-                setHomePhone(record.homePhone || ''); // 新增
-                setLineId(record.lineId || ''); // 新增
-                setFacebook(record.facebook || ''); // 新增
-                setInstagram(record.instagram || ''); // 新增
-                setIdNumber(record.idNumber || ''); // 新增
-                setBirthday(record.birthday || ''); // 新增
+                setHomePhone(record.homePhone || '');
+                setLineId(record.lineId || '');
+                setFacebook(record.facebook || '');
+                setInstagram(record.instagram || '');
+                setIdNumber(record.idNumber || '');
+                setBirthday(record.birthday || '');
                 setAddress(record.address || '');
                 setResidentialArea(record.residentialArea || '');
                 setOccupation(record.occupation || '');
@@ -813,20 +920,22 @@
                 setEmergencyContact1Phone(record.emergencyContact1Phone || '');
                 setEmergencyContact2Name(record.emergencyContact2Name || '');
                 setEmergencyContact2Phone(record.emergencyContact2Phone || '');
-                setLoanDate(record.loanDate || getTodayDateString()); // 新增：借款日期
+                setLoanDate(record.loanDate || getTodayDateString()); // Set loanDate for editing
 
-                setEditingRecordId(record.id);
-                setErrorMessage('');
-                setProjectedReturn(null);
-                setCurrentPage('addClient'); // Switch to form for editing
+                setEditingRecordId(record.id); // Set the ID of the record being edited
+                setErrorMessage(''); // Clear any old error messages
+                setProjectedReturn(null); // Reset projected return calculation
+                setCurrentPage('addClient'); // Switch to the form page for editing
             };
 
+            // Cancels the editing process and clears the form
             const handleCancelEdit = () => {
-                setEditingRecordId(null);
-                resetFields();
-                setCurrentPage('clientList'); // Return to list after cancel
+                setEditingRecordId(null); // Clear editing state
+                resetFields(); // Clear form fields
+                setCurrentPage('clientList'); // Return to the client list view
             };
 
+            // Initiates the delete confirmation dialog
             const handleDeleteRecord = async () => {
                 setErrorMessage('');
                 if (!db || !userId || !recordToDelete) {
@@ -838,11 +947,12 @@
 
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the document to be deleted
                     const docRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions`, recordToDelete);
-                    await window.firebase.deleteDoc(docRef);
+                    await window.firebase.deleteDoc(docRef); // Perform the deletion
                     setErrorMessage("紀錄已成功刪除。");
-                    setShowConfirmDeleteDialog(false);
-                    setRecordToDelete(null);
+                    setShowConfirmDeleteDialog(false); // Close the confirmation dialog
+                    setRecordToDelete(null); // Clear the record to delete state
                 } catch (error) {
                     console.error("Error deleting document:", error);
                     setErrorMessage("刪除紀錄失敗。");
@@ -851,7 +961,7 @@
                 }
             };
 
-            // Functions to manage outcome types in settings
+            // Functions to manage custom outcome types in settings modal
             const handleAddManagedOutcomeType = async () => {
                 if (newOutcomeTypeInput.trim() === '') {
                     setErrorMessage("請輸入有效的結果類型名稱。");
@@ -864,19 +974,23 @@
                 setErrorMessage('');
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the outcome types collection
                     const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
+                    // Add the new outcome type as a document with its name as the ID
                     await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, newOutcomeTypeInput.trim()), { exists: true });
-                    setNewOutcomeTypeInput('');
+                    setNewOutcomeTypeInput(''); // Clear the input field
                 } catch (error) {
                     console.error("Error adding outcome type:", error);
                     setErrorMessage("新增結果類型失敗。");
                 }
             };
 
+            // Deletes a custom outcome type from settings
             const handleDeleteManagedOutcomeType = async (typeToDelete) => {
                 setErrorMessage('');
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the specific outcome type document to delete
                     const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
                     await window.firebase.deleteDoc(window.firebase.doc(outcomeTypesRef, typeToDelete));
                 } catch (error) {
@@ -886,6 +1000,7 @@
             };
 
             // --- Cash Flow Record Management ---
+            // Handles saving a new cash flow record for the current loan
             const handleSaveCashFlowRecord = async () => {
                 setErrorMessage('');
                 if (!db || !userId || !editingRecordId) {
@@ -894,45 +1009,73 @@
                 }
 
                 const parsedCashFlowAmount = parseFloat(newCashFlowAmount);
+                let finalCashFlowItem = newCashFlowItem;
 
-                if (isNaN(parsedCashFlowAmount) || parsedCashFlowAmount === 0) {
+                // Determine cash flow type based on amount
+                let inferredCashFlowType;
+                if (parsedCashFlowAmount > 0) {
+                    inferredCashFlowType = '還款';
+                } else if (parsedCashFlowAmount < 0) {
+                    inferredCashFlowType = '出款';
+                } else {
                     setErrorMessage('請輸入有效的金流金額 (非零)。');
                     return;
                 }
-                if (newCashFlowType.trim() === '') {
-                    setErrorMessage('請選擇金流類型。');
+
+                // If "其他" is selected for item, use the custom input value
+                if (newCashFlowItem === '其他') {
+                    if (customCashFlowItemInput.trim() === '') {
+                        setErrorMessage('請輸入自訂金流名目。');
+                        return;
+                    }
+                    finalCashFlowItem = customCashFlowItemInput.trim();
+                }
+
+                // Basic validation for cash flow inputs
+                if (isNaN(parsedCashFlowAmount) || parsedCashFlowAmount === 0) {
+                    setErrorMessage('請輸入有效的金流金額 (非零)。');
                     return;
                 }
                 if (newCashFlowDate.trim() === '') {
                     setErrorMessage('請選擇金流日期。');
                     return;
                 }
-                if (newCashFlowItem.trim() === '') {
-                    setErrorMessage('請選擇金流名目。');
+                if (finalCashFlowItem.trim() === '') {
+                    setErrorMessage('請選擇或輸入金流名目。');
                     return;
                 }
 
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the cash flow sub-collection for the current transaction
                     const cashFlowsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/cashFlows`);
 
+                    // Add the new cash flow document
                     await window.firebase.addDoc(cashFlowsCollectionRef, {
-                        type: newCashFlowType.trim(),
+                        type: inferredCashFlowType, // Use inferred type
                         date: newCashFlowDate,
                         amount: parsedCashFlowAmount,
-                        item: newCashFlowItem.trim(),
+                        item: finalCashFlowItem,
                         notes: newCashFlowNotes.trim(),
                         timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
                         addedBy: userId,
                     });
                     setErrorMessage("金流紀錄新增成功。");
+                    // Reset cash flow input fields
                     setNewCashFlowAmount('');
                     setNewCashFlowItem('本金+利息');
                     setNewCashFlowNotes('');
+                    setCustomCashFlowItemInput(''); // Clear custom item input
 
-                    // After saving cash flow, re-calculate and update actualProfit on the parent transaction
+                    // Save new custom item to Firestore if it's not already in managed lists
+                    if (newCashFlowItem === '其他' && !managedCashFlowItems.includes(finalCashFlowItem)) {
+                        const cashFlowItemsRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/cashFlowItems`);
+                        await window.firebase.setDoc(window.firebase.doc(cashFlowItemsRef, finalCashFlowItem), { exists: true });
+                    }
+
+                    // After saving a cash flow, re-calculate and update the actualProfit on the parent transaction document
                     const parentTransactionDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions`, editingRecordId);
-                    const cashFlowsSnapshot = await window.firebase.getDocs(cashFlowsCollectionRef);
+                    const cashFlowsSnapshot = await window.firebase.getDocs(cashFlowsCollectionRef); // Get all cash flows again
                     let totalIncomingForLoan = 0;
                     let totalOutgoingForLoan = 0;
                     cashFlowsSnapshot.forEach(cfDoc => {
@@ -940,14 +1083,13 @@
                         if (cfData.type === '還款') {
                             totalIncomingForLoan += cfData.amount;
                         } else if (cfData.type === '出款') {
-                            totalOutgoingForLoan += cfData.amount;
+                            totalOutgoingForLoan += Math.abs(cfData.amount); // Use absolute value for outgoing
                         }
                     });
                     const calculatedActualProfit = totalIncomingForLoan - totalOutgoingForLoan;
                     await window.firebase.updateDoc(parentTransactionDocRef, {
-                        actualProfit: calculatedActualProfit,
+                        actualProfit: calculatedActualProfit, // Update the actualProfit field
                     });
-
 
                 } catch (error) {
                     console.error("Error saving cash flow document:", error);
@@ -955,6 +1097,7 @@
                 }
             };
 
+            // Handles deleting a cash flow record
             const handleDeleteCashFlowRecord = async (cashFlowId) => {
                 setErrorMessage('');
                 if (!db || !userId || !editingRecordId) {
@@ -963,14 +1106,15 @@
                 }
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the specific cash flow document to delete
                     const docRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/cashFlows`, cashFlowId);
-                    await window.firebase.deleteDoc(docRef);
+                    await window.firebase.deleteDoc(docRef); // Perform the deletion
                     setErrorMessage("金流紀錄已成功刪除。");
 
-                    // After deleting cash flow, re-calculate and update actualProfit on the parent transaction
+                    // After deleting a cash flow, re-calculate and update the actualProfit on the parent transaction document
                     const parentTransactionDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions`, editingRecordId);
                     const cashFlowsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/cashFlows`);
-                    const cashFlowsSnapshot = await window.firebase.getDocs(cashFlowsCollectionRef);
+                    const cashFlowsSnapshot = await window.firebase.getDocs(cashFlowsCollectionRef); // Get remaining cash flows
                     let totalIncomingForLoan = 0;
                     let totalOutgoingForLoan = 0;
                     cashFlowsSnapshot.forEach(cfDoc => {
@@ -978,12 +1122,12 @@
                         if (cfData.type === '還款') {
                             totalIncomingForLoan += cfData.amount;
                         } else if (cfData.type === '出款') {
-                            totalOutgoingForLoan += cfData.amount;
+                            totalOutgoingForLoan += Math.abs(cfData.amount); // Use absolute value for outgoing
                         }
                     });
                     const calculatedActualProfit = totalIncomingForLoan - totalOutgoingForLoan;
                     await window.firebase.updateDoc(parentTransactionDocRef, {
-                        actualProfit: calculatedActualProfit,
+                        actualProfit: calculatedActualProfit, // Update the actualProfit field
                     });
 
                 } catch (error) {
@@ -993,12 +1137,14 @@
             };
 
             // --- Event History Record Management ---
+            // Handles saving a new event record for the current loan
             const handleSaveEventRecord = async () => {
                 setErrorMessage('');
                 if (!db || !userId || !editingRecordId) {
                     setErrorMessage("無法新增事件紀錄，請先選擇或新增客戶。");
                     return;
                 }
+                // Basic validation for event inputs
                 if (newEventType.trim() === '') {
                     setErrorMessage('請輸入事件類型。');
                     return;
@@ -1010,8 +1156,10 @@
 
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the event sub-collection for the current transaction
                     const eventsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/events`);
 
+                    // Add the new event document
                     await window.firebase.addDoc(eventsCollectionRef, {
                         date: newEventDate,
                         type: newEventType.trim(),
@@ -1020,6 +1168,7 @@
                         addedBy: userId,
                     });
                     setErrorMessage("事件紀錄新增成功。");
+                    // Reset event input fields
                     setNewEventType('');
                     setNewEventNotes('');
                 } catch (error) {
@@ -1028,6 +1177,7 @@
                 }
             };
 
+            // Handles deleting an event record
             const handleDeleteEventRecord = async (eventId) => {
                 setErrorMessage('');
                 if (!db || !userId || !editingRecordId) {
@@ -1036,8 +1186,9 @@
                 }
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    // Reference to the specific event document to delete
                     const docRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/transactions/${editingRecordId}/events`, eventId);
-                    await window.firebase.deleteDoc(docRef);
+                    await window.firebase.deleteDoc(docRef); // Perform the deletion
                     setErrorMessage("事件紀錄已成功刪除。");
                 } catch (error) {
                     console.error("Error deleting event document:", error);
@@ -1045,26 +1196,43 @@
                 }
             };
 
-
+            // Memoized filtered and sorted transaction history for efficient rendering
             const filteredTransactionsHistory = React.useMemo(() => {
                 const filtered = [...transactionsHistory];
 
-                return filtered.sort((a, b) => {
-                    const dateA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate().getTime() : a.timestamp) : 0;
-                    const dateB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate().getTime() : b.timestamp) : 0;
-                    return dateB - dateA;
-                });
-            }, [transactionsHistory]);
+                // Apply year and month filter if selected
+                const filteredByPeriod = filtered.filter(record => {
+                    const recordDate = record.loanDate ? new Date(record.loanDate) : (record.date ? new Date(record.date.substring(0, 10)) : null);
+                    if (!recordDate || isNaN(recordDate.getTime())) return false; // Skip invalid dates
 
-            // Adjust totals for loan context
-            const totalLoanAmountSum = React.useMemo(() => {
+                    const recordYear = recordDate.getFullYear().toString();
+                    const recordMonth = (recordDate.getMonth() + 1).toString().padStart(2, '0');
+
+                    const matchesYear = selectedSummaryYear === 'all' || recordYear === selectedSummaryYear;
+                    const matchesMonth = selectedSummaryMonth === 'all' || recordMonth === selectedSummaryMonth;
+
+                    return matchesYear && matchesMonth;
+                });
+
+                return filteredByPeriod.sort((a, b) => {
+                    // Sort by timestamp, newest first. Handle cases where timestamp might be missing or not a Firestore Timestamp object.
+                    const timeA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate().getTime() : a.timestamp) : 0;
+                    const timeB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate().getTime() : b.timestamp) : 0;
+                    return timeB - timeA;
+                });
+            }, [transactionsHistory, selectedSummaryYear, selectedSummaryMonth]); // Re-run when filters change
+
+            // Calculate total loan amount across all filtered transactions for the summary
+            const totalLoanAmountSumFiltered = React.useMemo(() => {
                 return filteredTransactionsHistory.reduce((sum, record) => {
                     return sum + record.loanAmount;
                 }, 0);
             }, [filteredTransactionsHistory]);
 
-            const totalActualProfitAppLevel = React.useMemo(() => {
+            // Calculate overall actual profit across all filtered transactions for the summary
+            const totalActualProfitAppLevelFiltered = React.useMemo(() => {
                 return filteredTransactionsHistory.reduce((sum, record) => {
+                    // Only sum if actualProfit is defined and not null
                     if (record.actualProfit !== undefined && record.actualProfit !== null) {
                         return sum + record.actualProfit;
                     }
@@ -1072,49 +1240,7 @@
                 }, 0);
             }, [filteredTransactionsHistory]);
 
-            const totalIncomingFromCashFlowsAppLevel = React.useMemo(() => {
-                // This sums all positive actualProfit from completed transactions
-                return filteredTransactionsHistory.reduce((sum, record) => {
-                    if (record.status === 'completed_success' && record.actualProfit !== undefined && record.actualProfit !== null) {
-                        return sum + record.actualProfit;
-                    }
-                    return sum;
-                }, 0);
-            }, [filteredTransactionsHistory]);
-
-            const totalOutgoingFromCashFlowsAppLevel = React.useMemo(() => {
-                // This sums all negative actualProfit (as absolute value) from completed transactions
-                return filteredTransactionsHistory.reduce((sum, record) => {
-                    if (record.status === 'completed_failure' && record.actualProfit !== undefined && record.actualProfit !== null) {
-                        return sum + Math.abs(record.actualProfit);
-                    }
-                    return sum;
-                }, 0);
-            }, [filteredTransactionsHistory]);
-
-
-            // Total Net Profit for a specific loan based on its cash flows
-            const calculateLoanNetProfit = React.useCallback((loanId) => {
-                const loanRecord = transactionsHistory.find(rec => rec.id === loanId);
-                if (!loanRecord) return null; // Return null if record not found
-
-                // Check if actualProfit is explicitly set and not null
-                if (loanRecord.actualProfit !== undefined && loanRecord.actualProfit !== null) {
-                    return loanRecord.actualProfit;
-                }
-
-                // If actualProfit is not set, return '待計算'
-                return '待計算';
-            }, [transactionsHistory]);
-
-            const totalCustomers = React.useMemo(() => {
-                const uniqueClients = new Set();
-                filteredTransactionsHistory.forEach(record => {
-                    uniqueClients.add(record.clientName);
-                });
-                return uniqueClients.size;
-            }, [filteredTransactionsHistory]);
-
+            // Calculate total incoming from cash flows for the current loan (for cashFlowSummary page)
             const totalIncomingFromCashFlows = React.useMemo(() => {
                 return cashFlows.reduce((sum, record) => {
                     if (record.type === '還款') {
@@ -1124,20 +1250,45 @@
                 }, 0);
             }, [cashFlows]);
 
+            // Calculate total outgoing from cash flows for the current loan (for cashFlowSummary page)
             const totalOutgoingFromCashFlows = React.useMemo(() => {
                 return cashFlows.reduce((sum, record) => {
                     if (record.type === '出款') {
-                        return sum + record.amount;
+                        return sum + Math.abs(record.amount); // Use absolute value for outgoing
                     }
                     return sum;
                 }, 0);
             }, [cashFlows]);
 
+            // Calculate current cash flow status (net) for the current loan
             const currentCashFlowStatus = React.useMemo(() => {
                 return (totalIncomingFromCashFlows - totalOutgoingFromCashFlows).toFixed(2);
             }, [totalIncomingFromCashFlows, totalOutgoingFromCashFlows]);
 
+            // Calculate Net Profit for a specific loan based on its stored actualProfit
+            const calculateLoanNetProfit = React.useCallback((loanId) => {
+                const loanRecord = transactionsHistory.find(rec => rec.id === loanId);
+                if (!loanRecord) return null; // Return null if record not found
 
+                // Check if actualProfit is explicitly set and not null
+                if (loanRecord.actualProfit !== undefined && loanRecord.actualProfit !== null) {
+                    return loanRecord.actualProfit;
+                }
+
+                // If actualProfit is not set, return '待計算' (pending calculation)
+                return '待計算';
+            }, [transactionsHistory]); // Dependency on transactionsHistory to re-evaluate when it changes
+
+            // Calculate total unique customers for the filtered period
+            const totalCustomersFiltered = React.useMemo(() => {
+                const uniqueClients = new Set();
+                filteredTransactionsHistory.forEach(record => {
+                    uniqueClients.add(record.clientName);
+                });
+                return uniqueClients.size;
+            }, [filteredTransactionsHistory]);
+
+            // Resets all form fields to their initial empty or default states
             const resetFields = () => {
                 setClientName('');
                 setLoanAmount('');
@@ -1153,12 +1304,12 @@
                 setEventHistoryRecords([]); // Clear event history
                 // Reset new client detail fields
                 setContactMethod('');
-                setHomePhone(''); // 新增
-                setLineId(''); // 新增
-                setFacebook(''); // 新增
-                setInstagram(''); // 新增
-                setIdNumber(''); // 新增
-                setBirthday(''); // 新增
+                setHomePhone('');
+                setLineId('');
+                setFacebook('');
+                setInstagram('');
+                setIdNumber('');
+                setBirthday('');
                 setAddress('');
                 setResidentialArea('');
                 setOccupation('');
@@ -1170,11 +1321,11 @@
                 setEmergencyContact2Name('');
                 setEmergencyContact2Phone('');
                 // Reset cash flow input fields
-                setNewCashFlowType('出款');
                 setNewCashFlowDate(getTodayDateString());
                 setNewCashFlowAmount('');
                 setNewCashFlowItem('本金+利息');
                 setNewCashFlowNotes('');
+                setCustomCashFlowItemInput('');
                 // Reset event input fields
                 setNewEventDate(getTodayDateString());
                 setNewEventType('');
@@ -1182,17 +1333,20 @@
                 setLoanDate(getTodayDateString()); // Reset loanDate
             };
 
+            // Exports the filtered transaction history to a CSV file
             const exportToCsv = () => {
                 if (filteredTransactionsHistory.length === 0) {
                     setErrorMessage('沒有紀錄可以導出。');
                     return;
                 }
 
+                // Define CSV headers
                 const headers = ["序號", "借款日期", "客戶名稱", "借款金額", "淨額", "利率(%)", "還款方式", "期數", "實際結果", "聯絡方式", "住宅電話", "Line ID", "FB", "IG", "身分證字號", "生日", "住址", "居住地", "職業", "公司電話", "公司地址", "出款備註", "緊急聯絡人1", "緊急聯絡人1電話", "緊急聯絡人2", "緊急聯絡人2電話", "一般備註"];
                 const csvRows = [];
 
-                csvRows.push(headers.join(','));
+                csvRows.push(headers.join(',')); // Add headers to CSV rows
 
+                // Add data rows
                 filteredTransactionsHistory.forEach((record, index) => {
                     const netProfitValue = calculateLoanNetProfit(record.id);
                     const netProfitDisplay = typeof netProfitValue === 'string' ? netProfitValue : netProfitValue.toFixed(2);
@@ -1204,15 +1358,15 @@
                         netProfitDisplay, // Added Net Profit
                         record.interestRate,
                         record.repaymentMethod,
-                        record.loanTerm || 'N/A',
+                        record.loanTerm || 'N/A', // Display 'N/A' if no loan term
                         record.status === 'pending' ? '待定' : (record.actualOutcome === 'completed_success' ? '成交' : '失敗'),
                         record.contactMethod || '',
-                        record.homePhone || '', // 新增
-                        record.lineId || '', // 新增
-                        record.facebook || '', // 新增
-                        record.instagram || '', // 新增
-                        record.idNumber || '', // 新增
-                        record.birthday || '', // 新增
+                        record.homePhone || '',
+                        record.lineId || '',
+                        record.facebook || '',
+                        record.instagram || '',
+                        record.idNumber || '',
+                        record.birthday || '',
                         record.address || '',
                         record.residentialArea || '',
                         record.occupation || '',
@@ -1225,26 +1379,29 @@
                         record.emergencyContact2Phone || '',
                         record.notes || ''
                     ];
-                    csvRows.push(row.join(','));
+                    csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')); // Enclose fields in quotes and escape existing quotes
                 });
 
-                csvRows.push('');
-                csvRows.push(`總出款:,${(totalLoanAmountSum * -1).toFixed(2)} NTD`);
-                csvRows.push(`總收入:,${totalIncomingFromCashFlowsAppLevel.toFixed(2)} NTD`);
-                csvRows.push(`金流狀況 (淨額):,${totalActualProfitAppLevel.toFixed(2)} NTD`); // Recalculated for overall app
-                csvRows.push(`總客戶數:,${totalCustomers}`);
+                // Add summary statistics to CSV
+                csvRows.push(''); // Empty line for separation
+                csvRows.push(`總出款:,${(totalLoanAmountSumFiltered * -1).toFixed(2)} NTD`); // Total outgoing loans for filtered period
+                csvRows.push(`總淨利:,${totalActualProfitAppLevelFiltered.toFixed(2)} NTD`); // Overall net profit for filtered period
+                csvRows.push(`金流狀況 (結餘):,${totalActualProfitAppLevelFiltered.toFixed(2)} NTD`); // Overall net profit for filtered period
+                csvRows.push(`總客戶數:,${totalCustomersFiltered}`); // Total customers for filtered period
 
+                // Create and download the CSV file
                 const csvString = csvRows.join('\n');
-                const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
+                const blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' }); // Add BOM for UTF-8 compatibility
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `客戶列表_${new Date().toISOString().split('T')[0]}.csv`;
+                link.download = `客戶列表_${new Date().toISOString().split('T')[0]}.csv`; // Filename with current date
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
+                URL.revokeObjectURL(link.href); // Clean up URL object
             };
 
+            // Handles printing the client list section
             const handlePrintRecordsOnly = () => {
                 const printContent = document.getElementById('transaction-history-section');
                 if (!printContent) {
@@ -1252,6 +1409,7 @@
                     return;
                 }
 
+                // Construct the HTML content for printing, including necessary styles
                 let printContentHtml = `
                     <!DOCTYPE html>
                     <html lang="zh-TW">
@@ -1319,19 +1477,19 @@
                             </tbody>
                         </table>
                         <div style="text-align: center; margin-top: 20px; font-size: 1.1em; font-weight: bold;">
-                            金流狀況:
-                            <span class="${parseFloat(totalActualProfitAppLevel) >= 0 ? 'blue-text' : 'red-text'}">
-                                ${totalActualProfitAppLevel.toFixed(2)} NTD
+                            金流狀況 (結餘):
+                            <span class="${parseFloat(totalActualProfitAppLevelFiltered) >= 0 ? 'blue-text' : 'red-text'}">
+                                ${totalActualProfitAppLevelFiltered.toFixed(2)} NTD
                             </span>
                         </div>
                         <div style="text-align: center; margin-top: 10px; font-size: 1em;">
-                            總出款: ${(totalLoanAmountSum * -1).toFixed(2)} NTD
+                            總出款: ${(totalLoanAmountSumFiltered * -1).toFixed(2)} NTD
                         </div>
                         <div style="text-align: center; margin-top: 10px; font-size: 1em;">
-                            總收入: ${totalIncomingFromCashFlowsAppLevel.toFixed(2)} NTD
+                            總淨利: ${totalActualProfitAppLevelFiltered.toFixed(2)} NTD
                         </div>
                         <div style="text-align: center; margin-top: 10px; font-size: 1em;">
-                            總客戶數: ${totalCustomers}
+                            總客戶數: ${totalCustomersFiltered}
                         </div>
                         <div style="text-align: center; margin-top: 30px; font-size: 0.8em; color: #6B7280;">
                             威爾設計版權所有 ver ${currentVersion}
@@ -1339,15 +1497,16 @@
                     </body>
                     </html>
                 `;
-                const printWindow = window.open('', '_blank', 'width=800,height=600');
+                const printWindow = window.open('', '_blank', 'width=800,height=600'); // Open a new window for printing
                 if (printWindow) {
-                    printWindow.document.write(printContentHtml);
-                    printWindow.document.close();
-                    printWindow.focus();
+                    printWindow.document.write(printContentHtml); // Write the generated HTML to the new window
+                    printWindow.document.close(); // Close the document to ensure content is rendered
+                    printWindow.focus(); // Focus the new window
 
+                    // Wait for the content to load before printing
                     printWindow.onload = () => {
-                        printWindow.print();
-                        printWindow.close();
+                        printWindow.print(); // Trigger print dialog
+                        printWindow.close(); // Close the window after printing
                     };
                 } else {
                     setErrorMessage('無法開啟列印視窗，請檢查瀏覽器設定或彈出視窗阻擋。');
@@ -1499,7 +1658,7 @@
                                     事件紀錄 (客戶: {transactionsHistory.find(rec => rec.id === editingRecordId)?.clientName})
                                 </h2>
 
-                                {/* Add New Event Record */}
+                                {/* Add New Event Record Form */}
                                 <div className="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
                                     <h3 className="text-xl font-semibold text-gray-800 mb-4">新增事件</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -1591,6 +1750,7 @@
                                     )}
                                 </div>
 
+                                {/* Close Event History Modal Button */}
                                 <div className="text-center mt-8">
                                     <button
                                         onClick={() => setShowEventHistoryModal(false)}
@@ -2093,6 +2253,32 @@
                                     </button>
                                 </div>
 
+                                {/* Year and Month filter for summary */}
+                                <div className="mb-4 flex flex-wrap gap-4 justify-center items-center p-4 bg-gray-50 rounded-lg shadow-inner">
+                                    <label htmlFor="summaryYear" className="text-gray-700 text-sm font-semibold">年月份篩選:</label>
+                                    <select
+                                        id="summaryYear"
+                                        value={selectedSummaryYear}
+                                        onChange={(e) => setSelectedSummaryYear(e.target.value)}
+                                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    >
+                                        <option value="all">全部年份</option>
+                                        {yearOptions.map(year => (
+                                            <option key={year} value={year.toString()}>{year}年</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        id="summaryMonth"
+                                        value={selectedSummaryMonth}
+                                        onChange={(e) => setSelectedSummaryMonth(e.target.value)}
+                                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                    >
+                                        {monthOptions.map(month => (
+                                            <option key={month.value} value={month.value}>{month.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
                                 {filteredTransactionsHistory.length > 0 ? (
                                     <>
                                         <div className="overflow-x-auto">
@@ -2185,17 +2371,17 @@
                                                 </tbody>
                                             </table>
                                         </div>
+                                        {/* Updated statistics display for filtered period */}
                                         <div className="mt-4 text-center text-lg font-bold">
-                                            金流狀況 (淨額):
-                                            <span className={`ml-2 ${parseFloat(totalActualProfitAppLevel) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                                                ${totalActualProfitAppLevel.toFixed(2)} NTD
+                                            金流狀況 (結餘):
+                                            <span className={`ml-2 ${parseFloat(totalActualProfitAppLevelFiltered) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                                {totalActualProfitAppLevelFiltered.toFixed(2)} NTD
                                             </span>
                                         </div>
-                                        {/* Updated statistics display */}
                                         <div className="mt-2 text-center text-base font-semibold text-gray-700">
-                                            總出款: <span className="text-blue-700">${(totalLoanAmountSum * -1).toFixed(2)} NTD</span> | {/* Display as negative */}
-                                            總收入: <span className="text-blue-700">${totalIncomingFromCashFlowsAppLevel.toFixed(2)} NTD</span> |
-                                            總客戶數: <span className="text-green-700">{totalCustomers}</span>
+                                            總出款: <span className="text-blue-700">${(totalLoanAmountSumFiltered * -1).toFixed(2)} NTD</span> |
+                                            總淨利: <span className="text-blue-700">${totalActualProfitAppLevelFiltered.toFixed(2)} NTD</span> |
+                                            總客戶數: <span className="text-green-700">{totalCustomersFiltered}</span>
                                         </div>
                                     </>
                                 ) : (
@@ -2219,26 +2405,27 @@
                                         <div>
                                             <p>總出款金額:</p>
                                             <span className="text-red-600 text-3xl">
-                                                ${(transactionsHistory.find(rec => rec.id === editingRecordId)?.loanAmount * -1 || 0).toFixed(2)} NTD
+                                                {(transactionsHistory.find(rec => rec.id === editingRecordId)?.loanAmount * -1 || 0).toFixed(2)} NTD
                                             </span>
                                         </div>
                                         <div>
                                             <p>金流收入:</p>
                                             <span className="text-green-600 text-3xl">
-                                                ${totalIncomingFromCashFlows.toFixed(2)} NTD
+                                                {totalIncomingFromCashFlows.toFixed(2)} NTD
                                             </span>
                                         </div>
                                         <div className="col-span-2">
                                             <p>金流狀況 (淨額):</p>
                                             <span className={`text-4xl ${parseFloat(currentCashFlowStatus) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                                                ${currentCashFlowStatus} NTD
+                                                {currentCashFlowStatus} NTD
                                             </span>
                                         </div>
+                                        {/* Display '每期應繳金額' if repayment method is '本+利' or '純繳利息' */}
                                         {transactionsHistory.find(rec => rec.id === editingRecordId) && (transactionsHistory.find(rec => rec.id === editingRecordId)?.repaymentMethod === '本+利' || transactionsHistory.find(rec => rec.id === editingRecordId)?.repaymentMethod === '純繳利息') && (
                                             <div className="col-span-2">
                                                 <p>每期應繳金額:</p>
                                                 <span className="text-purple-600 text-3xl">
-                                                    ${calculateAmountDuePerPeriod(
+                                                    {calculateAmountDuePerPeriod(
                                                         transactionsHistory.find(rec => rec.id === editingRecordId)?.loanAmount,
                                                         transactionsHistory.find(rec => rec.id === editingRecordId)?.interestRate,
                                                         transactionsHistory.find(rec => rec.id === editingRecordId)?.loanTerm,
@@ -2273,7 +2460,7 @@
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{cf.type}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{cf.date}</td>
                                                             <td className={`py-3 px-6 text-left ${cf.type === '還款' ? 'text-green-600' : 'text-red-600'}`}>
-                                                                ${cf.amount.toFixed(2)}
+                                                                {cf.amount.toFixed(2)}
                                                             </td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{cf.item}</td>
                                                             <td className="py-3 px-6 text-left">{cf.notes}</td>
@@ -2297,25 +2484,11 @@
                                     )}
                                 </div>
 
-                                {/* Add New Cash Flow Record (Moved to top) */}
+                                {/* Add New Cash Flow Record Form (Moved to top) */}
                                 <div className="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner mt-8">
                                     <h2 className="text-xl font-semibold text-gray-800 mb-4">新增金流紀錄</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div>
-                                            <label htmlFor="newCashFlowType" className="block text-gray-700 text-sm font-semibold mb-2">
-                                                類型:
-                                            </label>
-                                            <select
-                                                id="newCashFlowType"
-                                                value={newCashFlowType}
-                                                onChange={(e) => setNewCashFlowType(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
-                                            >
-                                                {managedCashFlowTypes.map(type => (
-                                                    <option key={type} value={type}>{type}</option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                        {/* Removed Type dropdown and its custom input */}
                                         <div>
                                             <label htmlFor="newCashFlowDate" className="block text-gray-700 text-sm font-semibold mb-2">
                                                 日期:
@@ -2337,7 +2510,7 @@
                                                 id="newCashFlowAmount"
                                                 value={newCashFlowAmount}
                                                 onChange={(e) => setNewCashFlowAmount(e.target.value)}
-                                                placeholder="例如: 1000"
+                                                placeholder="例如: 1000 (還款), -500 (出款)"
                                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
                                             />
                                         </div>
@@ -2354,7 +2527,17 @@
                                                 {managedCashFlowItems.map(item => (
                                                     <option key={item} value={item}>{item}</option>
                                                 ))}
+                                                <option value="其他">其他</option>
                                             </select>
+                                            {newCashFlowItem === '其他' && (
+                                                <input
+                                                    type="text"
+                                                    value={customCashFlowItemInput}
+                                                    onChange={(e) => setCustomCashFlowItemInput(e.target.value)}
+                                                    placeholder="輸入自訂名目"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800 mt-2"
+                                                />
+                                            )}
                                         </div>
                                         <div className="md:col-span-2">
                                             <label htmlFor="newCashFlowNotes" className="block text-gray-700 text-sm font-semibold mb-2">
