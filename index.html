@@ -6,22 +6,313 @@
     <title>金融業客戶關係管理系統 (CRM)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* Define custom colors for Red and White style */
+        :root {
+            --red-white-primary: #E53E3E; /* Bright Red */
+            --red-white-light: #FFEBEE;   /* Very light red for backgrounds */
+            --red-white-text-dark: #212121;    /* Dark gray for text */
+            --red-white-gray-light: #F7F7F7;   /* Very light gray for subtle backgrounds */
+            --red-white-medium-gray: #B0BEC5;  /* Medium gray for secondary elements */
+            --red-white-accent-dark: #C53030; /* Darker red for accents/hover */
+            --red-white-border-color: #CFD8DC; /* Light gray for borders */
+
+            /* Standard colors for status/values (kept for financial clarity) */
+            --status-success: #28a745; /* Green for positive */
+            --status-failure: #dc3545; /* Red for negative */
+            --status-pending: #ffc107; /* Yellow for pending */
+        }
+
         body {
             font-family: 'Inter', sans-serif;
+            background-color: var(--red-white-gray-light); /* Overall light background */
+            color: var(--red-white-text-dark);
         }
-        /* CSS for printing only the history section */
+
+        /* Adjust default Tailwind styling for inputs and selects for a cleaner look */
+        input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+            border-radius: 0.5rem; /* Slightly rounded corners */
+            border: 1px solid var(--red-white-border-color); /* Lighter border color */
+            background-color: white;
+            padding: 0.75rem 1rem; /* More padding */
+            font-size: 0.95rem;
+            color: var(--red-white-text-dark); /* Ensure text color is dark */
+            transition: all 0.2s ease-in-out;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--red-white-primary);
+            box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.2); /* Subtle red focus ring */
+            outline: none; /* Remove default outline */
+        }
+
+        /* Custom button styles for Red and White look */
+        .btn-primary {
+            background-color: var(--red-white-primary);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--red-white-primary);
+        }
+        .btn-primary:hover {
+            background-color: var(--red-white-accent-dark); /* Darker red on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(229, 62, 62, 0.3);
+        }
+
+        .btn-secondary {
+            background-color: var(--red-white-medium-gray);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--red-white-medium-gray);
+        }
+        .btn-secondary:hover {
+            background-color: #90A4AE; /* Darker gray on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-secondary:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(176, 190, 197, 0.5);
+        }
+
+        .btn-danger {
+            background-color: var(--status-failure); /* Red */
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--status-failure);
+        }
+        .btn-danger:hover {
+            background-color: #c82333; /* Darker red on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        .btn-danger:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(211, 47, 47, 0.3);
+        }
+
+        /* Specific styles for success/failure/pending badges */
+        .success-badge { background-color: var(--status-success); color: white; font-weight: 600; border-radius: 9999px; padding: 0.35rem 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .failure-badge { background-color: var(--status-failure); color: white; font-weight: 600; border-radius: 9999px; padding: 0.35rem 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .pending-badge { background-color: var(--status-pending); color: var(--red-white-text-dark); font-weight: 600; border-radius: 9999px; padding: 0.35rem 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+        /* General card/container styling */
+        .card {
+            background-color: white;
+            border-radius: 0.75rem; /* More rounded cards */
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1); /* Clearer, more defined shadow */
+            padding: 2.5rem; /* More padding */
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            border: 1px solid var(--red-white-border-color);
+        }
+        .card:hover {
+            transform: translateY(-4px); /* Subtle lift */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15); /* Deeper shadow on hover */
+        }
+
+        /* Header specific styling */
+        .app-header {
+            background-color: var(--red-white-primary);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem; /* Slightly rounded header */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .app-header .user-info {
+            display: flex;
+            align-items: center;
+            font-size: 0.95rem;
+        }
+        .app-header button {
+            background-color: rgba(255, 255, 255, 0.15); /* More subtle white */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .app-header button:hover {
+            background-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+        .app-header .settings-button {
+            background-color: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 0.6rem;
+            border-radius: 0.375rem; /* Square-ish button */
+        }
+        .app-header .settings-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05); /* Simple scale, no rotation */
+        }
+
+        /* Table styling */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            overflow: hidden;
+        }
+        table thead tr {
+            background-color: var(--red-white-primary);
+            color: white;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+        }
+        table th, table td {
+            padding: 14px 28px;
+            text-align: left;
+            border-bottom: 1px solid var(--red-white-border-color);
+        }
+        table th:first-child { border-top-left-radius: 0.5rem; }
+        table th:last-child { border-top-right-radius: 0.5rem; }
+        table tbody tr:last-child td:first-child { border-bottom-left-radius: 0.5rem; }
+        table tbody tr:last-child td:last-child { border-bottom-right-radius: 0.5rem; }
+
+        table tbody tr:hover {
+            background-color: #f2f2f2; /* Light gray hover for table rows */
+        }
+
+        /* Specific styles for action buttons in table cells */
+        .table-action-button {
+            font-weight: 600;
+            padding: 0.35rem 0.75rem; /* Smaller padding */
+            border-radius: 0.375rem; /* Consistent border-radius */
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            border: 1px solid transparent; /* Default transparent border */
+            color: white; /* Default white text for action buttons */
+        }
+
+        .table-action-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Override specific button colors for clarity */
+        .btn-edit {
+            background-color: #2196F3; /* Blue for edit */
+            border-color: #2196F3;
+        }
+        .btn-edit:hover {
+            background-color: #1976D2;
+        }
+
+        .btn-delete {
+            background-color: #F44336; /* Red for delete */
+            border-color: #F44336;
+        }
+        .btn-delete:hover {
+            background-color: #D32F2F;
+        }
+
+        .btn-cashflow {
+            background-color: var(--red-white-primary); /* Primary red for cash flow */
+            border-color: var(--red-white-primary);
+        }
+        .btn-cashflow:hover {
+            background-color: var(--red-white-accent-dark);
+        }
+
+        .btn-event {
+            background-color: var(--red-white-medium-gray); /* Gray for event */
+            color: white; /* White text for gray button */
+            border-color: var(--red-white-medium-gray);
+        }
+        .btn-event:hover {
+            background-color: #90A4AE;
+        }
+
+        /* Styles for the "成交" / "失敗" buttons in "實際結果" column */
+        .outcome-action-button {
+            font-weight: 600;
+            padding: 0.35rem 0.75rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            border: 1px solid transparent;
+            color: white !important; /* Ensure text is white for visibility */
+        }
+
+        .outcome-action-button.success {
+            background-color: var(--status-success) !important; /* Force background color */
+            border-color: var(--status-success);
+        }
+        .outcome-action-button.success:hover {
+            background-color: #388E3C !important;
+        }
+
+        .outcome-action-button.failure {
+            background-color: var(--status-failure) !important; /* Force background color */
+            border-color: var(--status-failure);
+        }
+        .outcome-action-button.failure:hover {
+            background-color: #C62828 !important;
+        }
+
+        /* Marquee specific styles */
+        .marquee-container {
+            overflow: hidden;
+            white-space: nowrap;
+            box-sizing: border-box;
+            background-color: var(--red-white-light); /* Light red background for marquee */
+            border: 1px solid var(--red-white-border-color);
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            margin-bottom: 1rem;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .marquee-text {
+            display: inline-block;
+            padding-left: 100%; /* Start off-screen to the right */
+            animation: marquee 15s linear infinite; /* Adjust time for speed */
+            color: var(--red-white-text-dark);
+            font-weight: 500;
+        }
+
+        @keyframes marquee {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-100%, 0); }
+        }
+
+
+        /* Print specific styles */
         @media print {
-            body > *:not(#print-area) { /* Hide all direct children of body except the print area */
+            body > *:not(#print-area) {
                 display: none !important;
             }
-            #print-area { /* Ensure the print area is visible and takes full width */
+            #print-area {
                 display: block !important;
                 width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
             }
-            /* Adjust table and text within print area for better print layout */
             #print-area table {
                 width: 100%;
                 border-collapse: collapse;
@@ -35,6 +326,20 @@
                 text-align: center;
                 margin-bottom: 20px;
             }
+            .success-text { color: #16A34A; font-weight: bold; }
+            .failure-text { color: #DC2626; font-weight: bold; }
+            .blue-text { color: #2563EB; font-weight: bold; }
+            .red-text { color: #DC2626; font-weight: bold; }
+            .outcome-badge {
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 9999px;
+                font-weight: 600;
+                font-size: 0.8em;
+                line-height: 1;
+            }
+            .success-badge { background-color: #D1FAE5; color: #065F46; }
+            .failure-badge { background-color: #FEE2E2; color: #991B1B; }
         }
     </style>
 </head>
@@ -110,7 +415,7 @@
 
 
     <script type="text/babel">
-        // Helper function to get today's date in YYYY-MM-DD format
+        // Helper function to get today's date inYYYY-MM-DD format
         const getTodayDateString = () => {
             const today = new Date();
             const year = today.getFullYear();
@@ -215,9 +520,99 @@
 
             // Page navigation state
             const [currentPage, setCurrentPage] = React.useState('clientList'); // 'clientList', 'addClient', 'cashFlowSummary', 'eventHistory'
+            const [showChart, setShowChart] = React.useState(false); // State to toggle chart visibility
+            const chartRef = React.useRef(null); // Ref for Chart.js instance
+
+            // Marquee content state
+            const [marqueeContents, setMarqueeContents] = React.useState(['', '', '']); // State for 3 marquee contents
 
             // Version history data for the update log modal
             const versionHistoryData = [
+                {
+                    version: "1.20.1",
+                    date: "2025-06-01",
+                    content: "修正 Firebase 文件路徑錯誤 (Invalid document reference)。統一使用者設定儲存至 `settings/mainSettings` 文件，並更新結果類型和跑馬燈內容的讀寫邏輯。修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。新增統計圖表功能，顯示選定年月份的總出款、總收入、金流狀況趨勢。",
+                },
+                {
+                    version: "1.20.0",
+                    date: "2025-06-01",
+                    content: "修正 Firebase 文件路徑錯誤 (Invalid document reference)。統一使用者設定儲存至 `settings/mainSettings` 文件，並更新結果類型和跑馬燈內容的讀寫邏輯。修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。新增統計圖表功能，顯示選定年月份的總出款、總收入、金流狀況趨勢。",
+                },
+                {
+                    version: "1.19.2",
+                    date: "2025-06-01",
+                    content: "修正 Chart.js 顏色配置的語法錯誤。修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。新增統計圖表功能，顯示選定年月份的總出款、總收入、金流狀況趨勢。設定頁面調整：結果類型管理部分不再預設新增「成交」、「失敗」、「待定」選項。首頁新增跑馬燈功能，內容可在設定頁中編輯。",
+                },
+                {
+                    version: "1.19.1",
+                    date: "2025-06-01",
+                    content: "修正 Chart.js 顏色配置的語法錯誤。修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。新增統計圖表功能，顯示選定年月份的總出款、總收入、金流狀況趨勢。設定頁面調整：結果類型管理部分不再預設新增「成交」、「失敗」、「待定」選項。首頁新增跑馬燈功能，內容可在設定頁中編輯。",
+                },
+                {
+                    version: "1.19.0",
+                    date: "2025-06-01",
+                    content: "介面風格調整為紅白配色，採用鮮明紅色作為主色調，搭配白色和中性灰色。修正 Chart.js 顏色配置的語法錯誤。修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。新增統計圖表功能，顯示選定年月份的總出款、總收入、金流狀況趨勢。",
+                },
+                {
+                    version: "1.18.1",
+                    date: "2025-06-01",
+                    content: "修正 Chart.js 顏色配置的語法錯誤。修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。新增統計圖表功能，顯示選定年月份的總出款、總收入、金流狀況趨勢。",
+                },
+                {
+                    version: "1.18.0",
+                    date: "2025-06-01",
+                    content: "修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。新增統計圖表功能，顯示選定年月份的總出款、總收入、金流狀況趨勢。",
+                },
+                {
+                    version: "1.17.2",
+                    date: "2025-06-01",
+                    content: "修正表格內「實際結果」及「操作」按鈕在未懸停時不可見的問題，確保所有按鈕都有明確的背景色和文字對比度。",
+                },
+                {
+                    version: "1.17.1",
+                    date: "2025-06-01",
+                    content: "金流數字顯示優化：客戶列表總覽區塊的「總出款」固定顯示紅色，「總淨利」根據正負值顯示綠色或紅色。金流收支頁面總覽區塊的「總出款金額」和「金流收入」固定顯示紅/綠色，「金流狀況 (淨額)」根據正負值顯示主要深色或紅色。修正「實際結果」按鈕和表格內操作按鈕的配色，使其更清晰可見。",
+                },
+                {
+                    version: "1.17.0",
+                    date: "2025-06-01",
+                    content: "介面風格調整為合作金庫風格，採用深綠色主色調，搭配專業穩重的設計元素。金流數字顯示優化：客戶列表總覽區塊的「總出款」固定顯示紅色，「總淨利」根據正負值顯示綠色或紅色。金流收支頁面總覽區塊的「總出款金額」和「金流收入」固定顯示紅/綠色，「金流狀況 (淨額)」根據正負值顯示主要深色或紅色。修正「實際結果」按鈕在未懸停時不可見的問題，並統一調整表格內操作按鈕的配色，使其更符合工業風格且清晰可見。",
+                },
+                {
+                    version: "1.16.3",
+                    date: "2025-06-01",
+                    content: "金流數字顯示優化：客戶列表總覽區塊的「總出款」固定顯示紅色，「總淨利」根據正負值顯示綠色或紅色。金流收支頁面總覽區塊的「總出款金額」和「金流收入」固定顯示紅/綠色，「金流狀況 (淨額)」根據正負值顯示主要深色或紅色。修正「實際結果」按鈕在未懸停時不可見的問題，並統一調整表格內操作按鈕的配色，使其更符合工業風格且清晰可見。",
+                },
+                {
+                    version: "1.16.2",
+                    date: "2025-06-01",
+                    content: "金流數字顯示優化：客戶列表總覽區塊的「總出款」固定顯示紅色，「總淨利」根據正負值顯示綠色或紅色。金流收支頁面總覽區塊的「總出款金額」和「金流收入」固定顯示紅/綠色，「金流狀況 (淨額)」根據正負值顯示主要深色或紅色。修正「實際結果」按鈕在未懸停時不可見的問題，並統一調整表格內操作按鈕的配色，使其更符合工業風格且清晰可見。",
+                },
+                {
+                    version: "1.16.1",
+                    date: "2025-06-01",
+                    content: "修正「實際結果」按鈕在未懸停時不可見的問題，並統一調整表格內操作按鈕的配色，使其更符合工業風格且清晰可見。",
+                },
+                {
+                    version: "1.16.0",
+                    date: "2025-06-01",
+                    content: "介面風格調整為工業風，採用深色、中性灰和金屬色調，按鈕和卡片設計更為方正、堅固。金流紀錄列表排序改為日期升序（最後輸入的項目在最下方）。新增金流紀錄頁面：移除「類型」下拉式選單，類型依金額正負自動判斷；「名目」保留自訂功能。客戶列表下方新增年月份篩選器，篩選客戶交易紀錄並更新統計數據。",
+                },
+                {
+                    version: "1.15.0",
+                    date: "2025-06-01",
+                    content: "介面風格調整為年輕化風格，採用全新色彩主題，強化圓潤設計語言，增加動態互動效果，並優化排版。金流紀錄列表排序改為日期升序（最後輸入的項目在最下方）。新增金流紀錄頁面：移除「類型」下拉式選單，類型依金額正負自動判斷；「名目」保留自訂功能。客戶列表下方新增年月份篩選器，篩選客戶交易紀錄並更新統計數據。",
+                },
+                {
+                    version: "1.14.0",
+                    date: "2025-06-01",
+                    content: "介面風格調整為中國信託網站風格，強化主色調應用、優化背景與卡片設計、統一按鈕與輸入框風格、強調重要資訊。金流紀錄列表排序改為日期升序（最後輸入的項目在最下方）。新增金流紀錄頁面：移除「類型」下拉式選單，類型依金額正負自動判斷；「名目」保留自訂功能。客戶列表下方新增年月份篩選器，篩選客戶交易紀錄並更新統計數據。",
+                },
+                {
+                    version: "1.13.0",
+                    date: "2025-06-01",
+                    content: "介面風格調整為中國信託網站風格。金流紀錄列表排序改為日期升序（最後輸入的項目在最下方）。新增金流紀錄頁面：移除「類型」下拉式選單，類型依金額正負自動判斷；「名目」保留自訂功能。客戶列表下方新增年月份篩選器，篩選客戶交易紀錄並更新統計數據。",
+                },
                 {
                     version: "1.12.0",
                     date: "2025-06-01",
@@ -442,21 +837,30 @@
                 if (!db || !isAuthReady || !userId) return;
 
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                // Construct the Firestore collection reference for outcome types
-                const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
+                // Corrected path: userSettings is now a document, not a collection
+                const userSettingsDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/settings`, 'mainSettings');
 
-                // Set up real-time listener for outcome types
-                const unsubscribeOutcomeTypes = window.firebase.onSnapshot(outcomeTypesRef, (snapshot) => {
-                    const types = snapshot.docs.map(doc => doc.id); // Get document IDs as types
-                    setManagedOutcomeTypes(types.sort()); // Sort and set the types
+                // Set up real-time listener for user settings document
+                const unsubscribeUserSettings = window.firebase.onSnapshot(userSettingsDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setManagedOutcomeTypes(data.outcomeTypes || []); // No default values here, user must add them
+                        setMarqueeContents(data.marqueeContents || ['', '', '']);
+                    } else {
+                        // If userSettingsDoc doesn't exist, create it with empty arrays
+                        window.firebase.setDoc(userSettingsDocRef, {
+                            outcomeTypes: [],
+                            marqueeContents: ['', '', '']
+                        });
+                        setManagedOutcomeTypes([]);
+                        setMarqueeContents(['', '', '']);
+                    }
                 }, (error) => {
-                    console.error("Error fetching outcome types:", error);
+                    console.error("Error fetching user settings data:", error);
                 });
 
-                return () => {
-                    unsubscribeOutcomeTypes(); // Cleanup listener on component unmount or dependencies change
-                };
-            }, [db, isAuthReady, userId]); // Re-run if db, auth readiness, or userId changes
+                return () => unsubscribeUserSettings();
+            }, [db, isAuthReady, userId]);
 
             // --- Load managed cash flow types from Firestore ---
             React.useEffect(() => {
@@ -770,9 +1174,7 @@
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
                     // Reference to the main transactions collection
                     const transactionsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/transactions`);
-                    // Reference to the outcome types for default creation if not exists
-                    const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
-
+                    
                     // Data object for the transaction record
                     const recordData = {
                         clientName: clientName.trim(),
@@ -805,7 +1207,7 @@
                         outcomeNotes: '', // Notes related to the outcome
                         date: localDateTimeString, // Timestamp of record creation/update
                         status: 'pending', // Initial status
-                        timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(), // Firestore server timestamp
+                        timestamp: window.firebase.serverTimestamp ? window.firebase.serverTimestamp() : Date.now(),
                         addedBy: userId, // User who added the record
                         actualProfit: null, // Initialize actualProfit for new records, will be calculated from cash flows
                     };
@@ -820,18 +1222,6 @@
                         // Add new record
                         await window.firebase.addDoc(transactionsCollectionRef, recordData);
                         setErrorMessage("新增紀錄成功。");
-                    }
-
-                    // Ensure default outcome types exist in Firestore for the current user
-                    // This creates them if they don't already exist
-                    if (!managedOutcomeTypes.includes('成交')) {
-                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '成交'), { exists: true });
-                    }
-                    if (!managedOutcomeTypes.includes('失敗')) {
-                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '失敗'), { exists: true });
-                    }
-                    if (!managedOutcomeTypes.includes('待定')) {
-                        await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, '待定'), { exists: true });
                     }
 
                     resetFields(); // Clear form fields
@@ -956,8 +1346,6 @@
                 } catch (error) {
                     console.error("Error deleting document:", error);
                     setErrorMessage("刪除紀錄失敗。");
-                    setShowConfirmDeleteDialog(false);
-                    setRecordToDelete(null);
                 }
             };
 
@@ -974,10 +1362,12 @@
                 setErrorMessage('');
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                    // Reference to the outcome types collection
-                    const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
-                    // Add the new outcome type as a document with its name as the ID
-                    await window.firebase.setDoc(window.firebase.doc(outcomeTypesRef, newOutcomeTypeInput.trim()), { exists: true });
+                    const userSettingsDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/settings`, 'mainSettings');
+                    const docSnap = await window.firebase.getDoc(userSettingsDocRef);
+                    const currentOutcomeTypes = docSnap.exists() ? (docSnap.data().outcomeTypes || []) : [];
+                    const updatedOutcomeTypes = [...currentOutcomeTypes, newOutcomeTypeInput.trim()];
+
+                    await window.firebase.setDoc(userSettingsDocRef, { outcomeTypes: updatedOutcomeTypes }, { merge: true });
                     setNewOutcomeTypeInput(''); // Clear the input field
                 } catch (error) {
                     console.error("Error adding outcome type:", error);
@@ -990,9 +1380,12 @@
                 setErrorMessage('');
                 try {
                     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                    // Reference to the specific outcome type document to delete
-                    const outcomeTypesRef = window.firebase.collection(db, `artifacts/${appId}/users/${userId}/settings/userSettings/outcomeTypes`);
-                    await window.firebase.deleteDoc(window.firebase.doc(outcomeTypesRef, typeToDelete));
+                    const userSettingsDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/settings`, 'mainSettings');
+                    const docSnap = await window.firebase.getDoc(userSettingsDocRef);
+                    const currentOutcomeTypes = docSnap.exists() ? (docSnap.data().outcomeTypes || []) : [];
+                    const updatedOutcomeTypes = currentOutcomeTypes.filter(type => type !== typeToDelete);
+
+                    await window.firebase.setDoc(userSettingsDocRef, { outcomeTypes: updatedOutcomeTypes }, { merge: true });
                 } catch (error) {
                     console.error("Error deleting outcome type:", error);
                     setErrorMessage("刪除結果類型失敗。");
@@ -1420,7 +1813,7 @@
                         <style>
                             body { font-family: 'Inter', sans-serif; margin: 20px; }
                             h2 { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                            table { width: 100%; border-collapse: collapse; }
                             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                             th { background-color: #f2f2f2; }
                             .success-text { color: #16A34A; font-weight: bold; }
@@ -1513,8 +1906,103 @@
                 }
             };
 
+            // Chart.js rendering logic
+            React.useEffect(() => {
+                if (showChart && filteredTransactionsHistory.length > 0) {
+                    const ctx = document.getElementById('cashFlowChart').getContext('2d');
+
+                    // Prepare data for the chart
+                    const chartData = {};
+                    filteredTransactionsHistory.forEach(record => {
+                        const dateKey = record.loanDate ? record.loanDate.substring(0, 7) : record.date.substring(0, 7); //YYYY-MM
+                        if (!chartData[dateKey]) {
+                            chartData[dateKey] = { totalOutgoing: 0, totalIncoming: 0, netProfit: 0 };
+                        }
+                        chartData[dateKey].totalOutgoing += record.loanAmount; // Initial loan is outgoing
+                        if (record.actualProfit !== undefined && record.actualProfit !== null) {
+                            chartData[dateKey].netProfit += record.actualProfit;
+                        }
+
+                        // Aggregate cash flows for each transaction within the filtered period
+                        // This requires fetching cash flows for each filtered transaction, which can be heavy.
+                        // For simplicity, we'll use the already calculated actualProfit for net.
+                        // For detailed incoming/outgoing, a more complex query would be needed.
+                    });
+
+                    // Sort data by date for chart labels
+                    const sortedDates = Object.keys(chartData).sort();
+                    const labels = sortedDates;
+                    const outgoingData = sortedDates.map(date => chartData[date].totalOutgoing);
+                    const netProfitData = sortedDates.map(date => chartData[date].netProfit);
+
+                    // Destroy existing chart if it exists
+                    if (chartRef.current) {
+                        chartRef.current.destroy();
+                    }
+
+                    // Create new chart instance
+                    chartRef.current = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: '總出款 (初始借款)',
+                                    data: outgoingData,
+                                    backgroundColor: 'rgba(211, 47, 47, 0.8)', /* Red */
+                                    borderColor: 'rgba(211, 47, 47, 1)',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: '金流淨額',
+                                    data: netProfitData,
+                                    backgroundColor: netProfitData.map(value => value >= 0 ? 'rgba(76, 175, 80, 0.8)' : 'rgba(211, 47, 47, 0.8)'), /* Green for positive, Red for negative */
+                                    borderColor: netProfitData.map(value => value >= 0 ? 'rgba(76, 175, 80, 1)' : 'rgba(211, 47, 47, 1)'),
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: '#212121', /* Dark text color */
+                                    },
+                                    grid: {
+                                        color: '#BDBDBD', /* Light border color */
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: '#212121', /* Dark text color */
+                                    },
+                                    grid: {
+                                        color: '#BDBDBD', /* Light border color */
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#212121', /* Dark text color */
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else if (chartRef.current) {
+                    // Destroy chart if not visible or no data
+                    chartRef.current.destroy();
+                    chartRef.current = null;
+                }
+            }, [showChart, filteredTransactionsHistory]); // Re-render chart when visibility or data changes
+
+
             return (
-                <div className="min-h-screen bg-gradient-to-br from-blue-100 to-white flex flex-col items-center justify-center p-4 font-sans">
+                <div className="min-h-screen bg-red-white-gray-light flex flex-col items-center justify-center p-4 font-sans">
                     {/* Display loading state */}
                     {loadingFirebase && (
                         <div className="absolute inset-0 bg-gray-200 bg-opacity-75 flex items-center justify-center z-50">
@@ -1523,12 +2011,12 @@
                     )}
 
                     {/* User Info and Sign-in/Sign-out buttons */}
-                    <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-100 text-gray-700 text-xs px-3 py-2 rounded-full shadow-md z-10">
+                    <div className="app-header absolute top-4 left-4 right-4">
                         {userId ? (
-                            <div className="flex items-center">
+                            <div className="user-info">
                                 <span className="font-bold mr-1">登入用戶:</span>
                                 {userName || userEmail || userId}
-                                {userEmail && <span className="ml-2 text-gray-500">({userEmail})</span>}
+                                {userEmail && <span className="ml-2 text-gray-200">({userEmail})</span>}
                             </div>
                         ) : (
                             <span className="font-bold">未登入</span>
@@ -1537,7 +2025,6 @@
                             {userId && !userEmail ? (
                                 <button
                                     onClick={handleGoogleSignIn}
-                                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-full transition duration-200"
                                     disabled={loadingFirebase || !isAuthReady}
                                 >
                                     Google 登入
@@ -1545,7 +2032,6 @@
                             ) : userId && userEmail ? (
                                 <button
                                     onClick={handleSignOut}
-                                    className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-full transition duration-200"
                                     disabled={loadingFirebase || !isAuthReady}
                                 >
                                     登出
@@ -1553,7 +2039,6 @@
                             ) : (
                                 <button
                                     onClick={handleGoogleSignIn}
-                                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-full transition duration-200"
                                     disabled={loadingFirebase || !isAuthReady}
                                 >
                                     Google 登入
@@ -1563,7 +2048,7 @@
                         {/* Settings Button */}
                         <button
                             onClick={() => setShowSettingsModal(true)}
-                            className="absolute top-2 right-4 p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                            className="settings-button"
                             title="設定"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -1575,19 +2060,19 @@
                     {/* Confirmation Dialog for single record delete */}
                     {showConfirmDeleteDialog && recordToDelete && (
                         <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
-                            <div className="bg-white p-6 rounded-lg shadow-xl text-center">
+                            <div className="card text-center">
                                 <p className="text-lg font-semibold mb-4">確定要刪除這筆紀錄嗎？</p>
                                 <p className="text-sm text-gray-600 mb-6">此操作無法復原。</p>
                                 <div className="flex justify-center space-x-4">
                                     <button
                                         onClick={() => { setShowConfirmDeleteDialog(false); setRecordToDelete(null); }}
-                                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-200"
+                                        className="btn-secondary"
                                     >
                                         取消
                                     </button>
                                     <button
                                         onClick={handleDeleteRecord}
-                                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                        className="btn-danger"
                                     >
                                         確認刪除
                                     </button>
@@ -1599,11 +2084,11 @@
                     {/* Settings Modal */}
                     {showSettingsModal && (
                         <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">設定</h2>
+                            <div className="card max-w-md w-full">
+                                <h2 className="text-2xl font-bold text-red-white-text-dark mb-4 text-center">設定</h2>
                                 {/* Outcome Type Management (only custom outcomes allowed) */}
                                 <div className="mb-4 border-t pt-4 mt-4">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">管理結果類型</h3>
+                                    <h3 className="text-lg font-semibold text-red-white-text-dark mb-2">管理結果類型</h3>
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {managedOutcomeTypes.map(type => (
                                             <span key={type} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm flex items-center">
@@ -1628,20 +2113,67 @@
                                                     handleAddManagedOutcomeType();
                                                 }
                                             }}
-                                            className="flex-grow px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="flex-grow"
                                         />
                                         <button
                                             onClick={handleAddManagedOutcomeType}
-                                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r-lg transition duration-200"
+                                            className="btn-primary rounded-r-lg"
                                         >
                                             新增
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Marquee Content Management */}
+                                <div className="mb-4 border-t pt-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-red-white-text-dark mb-2">跑馬燈內容設定</h3>
+                                    {[0, 1, 2].map(i => (
+                                        <div key={i} className="mb-2">
+                                            <label htmlFor={`marquee-${i}`} className="block text-red-white-text-dark text-sm font-semibold mb-1">
+                                                跑馬燈 {i + 1} 內容:
+                                            </label>
+                                            <input
+                                                type="text"
+                                                id={`marquee-${i}`}
+                                                value={marqueeContents[i]}
+                                                onChange={(e) => {
+                                                    const newContents = [...marqueeContents];
+                                                    newContents[i] = e.target.value;
+                                                    setMarqueeContents(newContents);
+                                                }}
+                                                placeholder={`輸入跑馬燈 ${i + 1} 的內容`}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={async () => {
+                                            if (!db || !userId) {
+                                                setErrorMessage("資料庫未準備好或未登入。");
+                                                return;
+                                            }
+                                            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                                            // Corrected: Use doc to reference the mainSettings document
+                                            const userSettingsDocRef = window.firebase.doc(db, `artifacts/${appId}/users/${userId}/settings`, 'mainSettings');
+                                            try {
+                                                // Update only the marqueeContents field
+                                                await window.firebase.setDoc(userSettingsDocRef, { marqueeContents: marqueeContents }, { merge: true });
+                                                setErrorMessage("跑馬燈內容已儲存。");
+                                            } catch (error) {
+                                                console.error("Error saving marquee content:", error);
+                                                setErrorMessage("儲存跑馬燈內容失敗。");
+                                            }
+                                        }}
+                                        className="btn-primary w-full mt-3"
+                                    >
+                                        儲存跑馬燈內容
+                                    </button>
+                                </div>
+
                                 <div className="text-center mt-4">
                                     <button
                                         onClick={() => setShowSettingsModal(false)}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                        className="btn-primary"
                                     >
                                         確定更新
                                     </button>
@@ -1653,17 +2185,17 @@
                     {/* Event History Modal */}
                     {showEventHistoryModal && editingRecordId && (
                         <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+                            <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                                <h2 className="text-2xl font-bold text-red-white-text-dark mb-4 text-center">
                                     事件紀錄 (客戶: {transactionsHistory.find(rec => rec.id === editingRecordId)?.clientName})
                                 </h2>
 
                                 {/* Add New Event Record Form */}
-                                <div className="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
-                                    <h3 className="text-xl font-semibold text-gray-800 mb-4">新增事件</h3>
+                                <div className="mb-8 p-6 bg-red-white-light rounded-lg shadow-inner">
+                                    <h3 className="text-xl font-semibold text-red-white-text-dark mb-4">新增事件</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                         <div>
-                                            <label htmlFor="newEventDate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="newEventDate" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 日期:
                                             </label>
                                             <input
@@ -1671,11 +2203,11 @@
                                                 id="newEventDate"
                                                 value={newEventDate}
                                                 onChange={(e) => setNewEventDate(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             />
                                         </div>
                                         <div>
-                                            <label htmlFor="newEventType" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="newEventType" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 類型:
                                             </label>
                                             <input
@@ -1684,11 +2216,11 @@
                                                 value={newEventType}
                                                 onChange={(e) => setNewEventType(e.target.value)}
                                                 placeholder="例如: 電話聯絡, 會面"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label htmlFor="newEventNotes" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="newEventNotes" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 備註:
                                             </label>
                                             <textarea
@@ -1697,13 +2229,13 @@
                                                 onChange={(e) => setNewEventNotes(e.target.value)}
                                                 placeholder="例如: 討論還款計畫"
                                                 rows="2"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             ></textarea>
                                         </div>
                                     </div>
                                     <button
                                         onClick={handleSaveEventRecord}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75"
+                                        className="w-full btn-primary"
                                         disabled={loadingFirebase || !isAuthReady}
                                     >
                                         新增事件
@@ -1712,19 +2244,19 @@
 
                                 {/* Event History Table */}
                                 <div className="mt-8">
-                                    <h3 className="text-xl font-extrabold text-gray-900 mb-4 text-center">事件紀錄列表</h3>
+                                    <h3 className="text-xl font-extrabold text-red-white-text-dark mb-4 text-center">事件紀錄列表</h3>
                                     {eventHistoryRecords.length > 0 ? (
                                         <div className="overflow-x-auto">
-                                            <table className="min-w-full bg-white rounded-lg shadow-md">
+                                            <table className="min-w-full">
                                                 <thead>
-                                                    <tr className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                                                        <th className="py-3 px-6 text-left">日期</th>
-                                                        <th className="py-3 px-6 text-left">類型</th>
-                                                        <th className="py-3 px-6 text-left">備註</th>
-                                                        <th className="py-3 px-6 text-left">操作</th>
+                                                    <tr>
+                                                        <th>日期</th>
+                                                        <th>類型</th>
+                                                        <th>備註</th>
+                                                        <th>操作</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="text-gray-600 text-sm font-light">
+                                                <tbody className="text-red-white-text-dark text-sm font-light">
                                                     {eventHistoryRecords.map(event => (
                                                         <tr key={event.id} className="border-b border-gray-200 hover:bg-gray-100">
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{event.date}</td>
@@ -1754,7 +2286,7 @@
                                 <div className="text-center mt-8">
                                     <button
                                         onClick={() => setShowEventHistoryModal(false)}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                        className="btn-primary"
                                     >
                                         關閉
                                     </button>
@@ -1768,8 +2300,8 @@
                     <div className="flex flex-col md:flex-row md:space-x-8 w-full max-w-7xl mt-20 sm:mt-24">
                         {/* Conditional Rendering based on currentPage */}
                         {currentPage === 'addClient' && (
-                            <div className="bg-white p-8 rounded-xl shadow-2xl w-full mb-8 transform transition-all duration-300 hover:scale-[1.01]">
-                                <h1 className="text-3xl font-extrabold text-gray-900 mb-6 text-center">
+                            <div className="card w-full mb-8">
+                                <h1 className="text-3xl font-extrabold text-red-white-text-dark mb-6 text-center">
                                     新增客戶
                                 </h1>
 
@@ -1777,7 +2309,7 @@
                                 <div className="flex flex-wrap justify-center sm:justify-start gap-2 mb-6">
                                     <button
                                         onClick={() => setCurrentPage('clientList')}
-                                        className="bg-gray-400 hover:bg-gray-500 text-white text-sm font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75"
+                                        className="btn-secondary"
                                     >
                                         返回客戶列表
                                     </button>
@@ -1804,7 +2336,7 @@
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Client Name */}
                                     <div className="md:col-span-2 mb-4">
-                                        <label htmlFor="clientName" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="clientName" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             客戶名稱:
                                         </label>
                                         <input
@@ -1813,13 +2345,13 @@
                                             value={clientName}
                                             onChange={(e) => setClientName(e.target.value)}
                                             placeholder="例如: 王小明"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Loan Date */}
                                     <div className="md:col-span-2 mb-4">
-                                        <label htmlFor="loanDate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="loanDate" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             借款日期:
                                         </label>
                                         <input
@@ -1827,13 +2359,13 @@
                                             id="loanDate"
                                             value={loanDate}
                                             onChange={(e) => setLoanDate(e.target.value)}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* ID Number */}
                                     <div className="mb-4">
-                                        <label htmlFor="idNumber" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="idNumber" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             身分證字號:
                                         </label>
                                         <input
@@ -1842,13 +2374,13 @@
                                             value={idNumber}
                                             onChange={(e) => setIdNumber(e.target.value)}
                                             placeholder="例如: A123456789"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Birthday */}
                                     <div className="mb-4">
-                                        <label htmlFor="birthday" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="birthday" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             生日:
                                         </label>
                                         <input
@@ -1856,13 +2388,13 @@
                                             id="birthday"
                                             value={birthday}
                                             onChange={(e) => setBirthday(e.target.value)}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Contact Method */}
                                     <div className="mb-4">
-                                        <label htmlFor="contactMethod" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="contactMethod" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             聯絡方式:
                                         </label>
                                         <input
@@ -1871,13 +2403,13 @@
                                             value={contactMethod}
                                             onChange={(e) => setContactMethod(e.target.value)}
                                             placeholder="例如: 手機號碼、Email"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Home Phone */}
                                     <div className="mb-4">
-                                        <label htmlFor="homePhone" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="homePhone" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             住宅電話:
                                         </label>
                                         <input
@@ -1886,13 +2418,13 @@
                                             value={homePhone}
                                             onChange={(e) => setHomePhone(e.target.value)}
                                             placeholder="例如: (02)1234-5678"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Line ID */}
                                     <div className="mb-4">
-                                        <label htmlFor="lineId" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="lineId" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             Line ID:
                                         </label>
                                         <input
@@ -1901,13 +2433,13 @@
                                             value={lineId}
                                             onChange={(e) => setLineId(e.target.value)}
                                             placeholder="例如: @yourlineid"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* FB */}
                                     <div className="mb-4">
-                                        <label htmlFor="facebook" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="facebook" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             FB:
                                         </label>
                                         <input
@@ -1916,13 +2448,13 @@
                                             value={facebook}
                                             onChange={(e) => setFacebook(e.target.value)}
                                             placeholder="例如: facebook.com/yourprofile"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* IG */}
                                     <div className="mb-4">
-                                        <label htmlFor="instagram" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="instagram" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             IG:
                                         </label>
                                         <input
@@ -1931,13 +2463,13 @@
                                             value={instagram}
                                             onChange={(e) => setInstagram(e.target.value)}
                                             placeholder="例如: @yourinstagram"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Address */}
                                     <div className="mb-4">
-                                        <label htmlFor="address" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="address" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             住址:
                                         </label>
                                         <input
@@ -1946,13 +2478,13 @@
                                             value={address}
                                             onChange={(e) => setAddress(e.target.value)}
                                             placeholder="例如: 台北市信義區忠孝東路一段1號"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Residential Area */}
                                     <div className="mb-4">
-                                        <label htmlFor="residentialArea" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="residentialArea" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             居住地:
                                         </label>
                                         <input
@@ -1961,13 +2493,13 @@
                                             value={residentialArea}
                                             onChange={(e) => setResidentialArea(e.target.value)}
                                             placeholder="例如: 台北市"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Occupation */}
                                     <div className="mb-4">
-                                        <label htmlFor="occupation" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="occupation" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             職業:
                                         </label>
                                         <input
@@ -1976,13 +2508,13 @@
                                             value={occupation}
                                             onChange={(e) => setOccupation(e.target.value)}
                                             placeholder="例如: 工程師"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Company Phone */}
                                     <div className="mb-4">
-                                        <label htmlFor="companyPhone" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="companyPhone" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             公司電話:
                                         </label>
                                         <input
@@ -1991,13 +2523,13 @@
                                             value={companyPhone}
                                             onChange={(e) => setCompanyPhone(e.target.value)}
                                             placeholder="例如: (02)1234-5678"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Company Address */}
                                     <div className="mb-4">
-                                        <label htmlFor="companyAddress" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="companyAddress" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             公司地址:
                                         </label>
                                         <input
@@ -2006,13 +2538,13 @@
                                             value={companyAddress}
                                             onChange={(e) => setCompanyAddress(e.target.value)}
                                             placeholder="例如: 台北市內湖區瑞光路99號"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Loan Amount */}
                                     <div className="mb-4">
-                                        <label htmlFor="loanAmount" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="loanAmount" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             借款金額 (NTD):
                                         </label>
                                         <input
@@ -2021,14 +2553,14 @@
                                             value={loanAmount}
                                             onChange={(e) => setLoanAmount(e.target.value)}
                                             placeholder="例如: 100000"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Interest Rate and Period */}
                                     <div className="mb-4 flex space-x-2">
                                         <div className="flex-1">
-                                            <label htmlFor="interestRate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="interestRate" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 利率 (%):
                                             </label>
                                             <input
@@ -2038,18 +2570,18 @@
                                                 onChange={(e) => setInterestRate(e.target.value)}
                                                 placeholder="例如: 5.0 (代表 5%)"
                                                 step="0.01"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             />
                                         </div>
                                         <div>
-                                            <label htmlFor="interestRatePeriod" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="interestRatePeriod" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 週期:
                                             </label>
                                             <select
                                                 id="interestRatePeriod"
                                                 value={interestRatePeriod}
                                                 onChange={(e) => setInterestRatePeriod(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             >
                                                 {managedInterestRatePeriods.map(period => (
                                                     <option key={period} value={period}>{period}</option>
@@ -2060,14 +2592,14 @@
 
                                     {/* Repayment Method */}
                                     <div className="mb-4">
-                                        <label htmlFor="repaymentMethod" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="repaymentMethod" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             還款方式:
                                         </label>
                                         <select
                                             id="repaymentMethod"
                                             value={repaymentMethod}
                                             onChange={(e) => setRepaymentMethod(e.target.value)}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         >
                                             {managedRepaymentMethods.map(method => (
                                                 <option key={method} value={method}>{method}</option>
@@ -2078,7 +2610,7 @@
                                     {/* Loan Term Input - conditionally displayed */}
                                     {repaymentMethod === '本+利' && (
                                         <div className="mb-4">
-                                            <label htmlFor="loanTerm" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="loanTerm" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 期數:
                                             </label>
                                             <input
@@ -2087,7 +2619,7 @@
                                                 value={loanTerm}
                                                 onChange={(e) => setLoanTerm(e.target.value)}
                                                 placeholder="例如: 12 (單位與利率週期一致)"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             />
                                             <p className="text-xs text-gray-500 mt-1">
                                                 例如：若利率為年利率，期數為年；若利率為月利率，期數為月。
@@ -2097,7 +2629,7 @@
 
                                     {/* Disbursement Notes */}
                                     <div className="md:col-span-2 mb-4">
-                                        <label htmlFor="disbursementNotes" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="disbursementNotes" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             出款備註:
                                         </label>
                                         <textarea
@@ -2106,13 +2638,13 @@
                                             onChange={(e) => setDisbursementNotes(e.target.value)}
                                             placeholder="例如: 首次出款，已確認帳戶資訊。"
                                             rows="2"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         ></textarea>
                                     </div>
 
                                     {/* Emergency Contact 1 */}
                                     <div className="mb-4">
-                                        <label htmlFor="emergencyContact1Name" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="emergencyContact1Name" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             緊急聯絡人1姓名:
                                         </label>
                                         <input
@@ -2121,11 +2653,11 @@
                                             value={emergencyContact1Name}
                                             onChange={(e) => setEmergencyContact1Name(e.target.value)}
                                             placeholder="例如: 李大明"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label htmlFor="emergencyContact1Phone" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="emergencyContact1Phone" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             緊急聯絡人1電話:
                                         </label>
                                         <input
@@ -2134,13 +2666,13 @@
                                             value={emergencyContact1Phone}
                                             onChange={(e) => setEmergencyContact1Phone(e.target.value)}
                                             placeholder="例如: 0912345678"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* Emergency Contact 2 */}
                                     <div className="mb-4">
-                                        <label htmlFor="emergencyContact2Name" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="emergencyContact2Name" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             緊急聯絡人2姓名:
                                         </label>
                                         <input
@@ -2149,11 +2681,11 @@
                                             value={emergencyContact2Name}
                                             onChange={(e) => setEmergencyContact2Name(e.target.value)}
                                             placeholder="例如: 陳小華"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
                                     <div className="mb-4">
-                                        <label htmlFor="emergencyContact2Phone" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="emergencyContact2Phone" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             緊急聯絡人2電話:
                                         </label>
                                         <input
@@ -2162,13 +2694,13 @@
                                             value={emergencyContact2Phone}
                                             onChange={(e) => setEmergencyContact2Phone(e.target.value)}
                                             placeholder="例如: 0987654321"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         />
                                     </div>
 
                                     {/* General Notes */}
                                     <div className="md:col-span-2 mb-4">
-                                        <label htmlFor="notes" className="block text-gray-700 text-sm font-semibold mb-2">
+                                        <label htmlFor="notes" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                             一般備註:
                                         </label>
                                         <textarea
@@ -2177,7 +2709,7 @@
                                             onChange={(e) => setNotes(e.target.value)}
                                             placeholder="例如: 客戶對此產品感興趣，需進一步追蹤。"
                                             rows="3"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                            className="w-full"
                                         ></textarea>
                                     </div>
                                 </div> {/* End of two-column grid */}
@@ -2193,14 +2725,15 @@
                                 <div className="flex space-x-4 mb-6 mt-6">
                                     <button
                                         onClick={handleSaveRecordButtonClick}
-                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75"
+                                        className="flex-1 btn-primary"
                                         disabled={loadingFirebase || !isAuthReady}
                                     >
                                         {editingRecordId ? '更新客戶資料' : '新增客戶資料'}
                                     </button>
                                     <button
                                         onClick={resetFields}
-                                        className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75"
+                                        className="flex-1 btn-secondary"
+                                        disabled={loadingFirebase || !isAuthReady}
                                     >
                                         重設
                                     </button>
@@ -2216,26 +2749,26 @@
 
                                 {/* Display area for the projected return (每期預期利息) */}
                                 {projectedReturn !== null && (
-                                    <div className="mt-6 p-6 bg-gray-50 rounded-xl shadow-inner text-center mb-4">
-                                        <h2 className="text-xl font-semibold text-gray-700 mb-2">借貸預覽 ({interestRatePeriod}預期利息):</h2>
-                                        <p className={`text-4xl font-extrabold ${parseFloat(projectedReturn) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    <div className="mt-6 p-6 bg-red-white-light rounded-xl shadow-inner text-center mb-4">
+                                        <h2 className="text-xl font-semibold text-red-white-text-dark mb-2">借貸預覽 ({interestRatePeriod}預期利息):</h2>
+                                        <p className={`text-4xl font-extrabold ${parseFloat(projectedReturn) >= 0 ? 'text-status-success' : 'text-status-failure'}`}>
                                             {projectedReturn} NTD
                                         </p>
-                                        <p className="text-sm text-gray-600 mt-2">此為借款金額在當前{interestRatePeriod}利率下，一{interestRatePeriod}預期產生之利息。</p>
+                                        <p className="text-sm text-red-white-text-dark mt-2">此為借款金額在當前{interestRatePeriod}利率下，一{interestRatePeriod}預期產生之利息。</p>
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {currentPage === 'clientList' && (
-                            <div id="transaction-history-section" className="bg-white p-8 rounded-xl shadow-2xl w-full overflow-y-auto max-h-[85vh] min-h-[200px]">
-                                <h2 className="text-xl font-extrabold text-gray-900 mb-4 text-center">客戶列表</h2>
+                            <div id="transaction-history-section" className="card w-full overflow-y-auto max-h-[85vh] min-h-[200px]">
+                                <h2 className="text-xl font-extrabold text-red-white-text-dark mb-4 text-center">客戶列表</h2>
 
                                 {/* Top navigation/action buttons */}
                                 <div className="mb-4 flex flex-col sm:flex-row sm:space-x-4 items-end justify-end">
                                     <button
                                         onClick={() => setCurrentPage('addClient')}
-                                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 mb-2 sm:mb-0"
+                                        className="w-full sm:w-auto btn-primary mb-2 sm:mb-0"
                                     >
                                         新增客戶
                                     </button>
@@ -2253,14 +2786,23 @@
                                     </button>
                                 </div>
 
+                                {/* Marquees Display */}
+                                {marqueeContents.map((content, index) => (
+                                    content && ( // Only render if content exists
+                                        <div key={`marquee-${index}`} className="marquee-container">
+                                            <span className="marquee-text">{content}</span>
+                                        </div>
+                                    )
+                                ))}
+
                                 {/* Year and Month filter for summary */}
-                                <div className="mb-4 flex flex-wrap gap-4 justify-center items-center p-4 bg-gray-50 rounded-lg shadow-inner">
-                                    <label htmlFor="summaryYear" className="text-gray-700 text-sm font-semibold">年月份篩選:</label>
+                                <div className="mb-4 flex flex-wrap gap-4 justify-center items-center p-4 bg-red-white-light rounded-lg shadow-inner">
+                                    <label htmlFor="summaryYear" className="text-red-white-text-dark text-sm font-semibold">年月份篩選:</label>
                                     <select
                                         id="summaryYear"
                                         value={selectedSummaryYear}
                                         onChange={(e) => setSelectedSummaryYear(e.target.value)}
-                                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-white-primary focus:border-transparent transition duration-200 ease-in-out text-red-white-text-dark"
                                     >
                                         <option value="all">全部年份</option>
                                         {yearOptions.map(year => (
@@ -2271,40 +2813,54 @@
                                         id="summaryMonth"
                                         value={selectedSummaryMonth}
                                         onChange={(e) => setSelectedSummaryMonth(e.target.value)}
-                                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-white-primary focus:border-transparent transition duration-200 ease-in-out text-red-white-text-dark"
                                     >
                                         {monthOptions.map(month => (
                                             <option key={month.value} value={month.value}>{month.label}</option>
                                         ))}
                                     </select>
+                                    <button
+                                        onClick={() => setShowChart(!showChart)}
+                                        className="w-full sm:w-auto btn-secondary"
+                                    >
+                                        {showChart ? '隱藏圖表' : '查看圖表'}
+                                    </button>
                                 </div>
+
+                                {/* Statistical Chart Section */}
+                                {showChart && (
+                                    <div className="mb-8 p-6 bg-white rounded-lg shadow-xl" style={{ height: '400px' }}>
+                                        <h3 className="text-xl font-extrabold text-red-white-text-dark mb-4 text-center">金流趨勢圖 ({selectedSummaryYear === 'all' ? '全部年份' : `${selectedSummaryYear}年`} {selectedSummaryMonth === 'all' ? '全部月份' : `${parseInt(selectedSummaryMonth)}月`})</h3>
+                                        <canvas id="cashFlowChart"></canvas>
+                                    </div>
+                                )}
 
                                 {filteredTransactionsHistory.length > 0 ? (
                                     <>
                                         <div className="overflow-x-auto">
-                                            <table className="min-w-full bg-white rounded-lg shadow-md">
+                                            <table className="min-w-full">
                                                 <thead>
-                                                    <tr className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                                                        <th className="py-3 px-6 text-left">序號</th>
-                                                        <th className="py-3 px-6 text-left">借款日期</th>
-                                                        <th className="py-3 px-6 text-left">客戶名稱</th>
-                                                        <th className="py-3 px-6 text-left">借款金額</th>
-                                                        <th className="py-3 px-6 text-left">淨額</th> {/* Added Net Profit */}
-                                                        <th className="py-3 px-6 text-left">利率(%)</th>
-                                                        <th className="py-3 px-6 text-left">還款方式</th>
-                                                        <th className="py-3 px-6 text-left">期數</th>
-                                                        <th className="py-3 px-6 text-left">實際結果</th>
-                                                        <th className="py-3 px-6 text-left">操作</th>
+                                                    <tr>
+                                                        <th>序號</th>
+                                                        <th>借款日期</th>
+                                                        <th>客戶名稱</th>
+                                                        <th>借款金額</th>
+                                                        <th>淨額</th> {/* Added Net Profit */}
+                                                        <th>利率(%)</th>
+                                                        <th>還款方式</th>
+                                                        <th>期數</th>
+                                                        <th>實際結果</th>
+                                                        <th>操作</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="text-gray-600 text-sm font-light">
+                                                <tbody className="text-red-white-text-dark text-sm font-light">
                                                     {filteredTransactionsHistory.map((record, index) => (
                                                         <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-100">
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{index + 1}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanDate ? record.loanDate.substring(0, 10) : record.date.substring(0, 10)}</td> {/* Use loanDate if available */}
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.clientName}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{record.loanAmount}</td>
-                                                            <td className={`py-3 px-6 text-left whitespace-nowrap ${calculateLoanNetProfit(record.id) !== null && typeof calculateLoanNetProfit(record.id) === 'number' && calculateLoanNetProfit(record.id) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                            <td className={`py-3 px-6 text-left whitespace-nowrap ${calculateLoanNetProfit(record.id) !== null && typeof calculateLoanNetProfit(record.id) === 'number' && calculateLoanNetProfit(record.id) >= 0 ? 'text-status-success' : 'text-status-failure'}`}>
                                                                 {calculateLoanNetProfit(record.id) !== null ? (typeof calculateLoanNetProfit(record.id) === 'number' ? calculateLoanNetProfit(record.id).toFixed(2) : calculateLoanNetProfit(record.id)) : '待計算'}
                                                             </td> {/* Display Net Profit */}
                                                             <td className="py-3 px-6 text-left">{record.interestRate}</td>
@@ -2315,21 +2871,21 @@
                                                                     <div className="flex space-x-2">
                                                                         <button
                                                                             onClick={() => updateTransactionStatus(record.id, 'completed_success')}
-                                                                            className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                            className="outcome-action-button success"
                                                                             disabled={loadingFirebase || !isAuthReady}
                                                                         >
                                                                             成交
                                                                         </button>
                                                                         <button
                                                                             onClick={() => updateTransactionStatus(record.id, 'completed_failure')}
-                                                                            className="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                            className="outcome-action-button failure"
                                                                             disabled={loadingFirebase || !isAuthReady}
                                                                         >
                                                                             失敗
                                                                         </button>
                                                                     </div>
                                                                 ) : (
-                                                                    <span className={`px-2 py-1 font-semibold leading-tight rounded-full ${record.actualOutcome === 'completed_success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                    <span className={`px-2 py-1 font-semibold leading-tight rounded-full ${record.actualOutcome === 'completed_success' ? 'success-badge' : 'failure-badge'}`}>
                                                                         {record.actualOutcome === 'completed_success' ? '成交' : '失敗'}
                                                                     </span>
                                                                 )}
@@ -2338,28 +2894,28 @@
                                                                 <div className="flex space-x-2">
                                                                     <button
                                                                         onClick={() => handleEditRecord(record)}
-                                                                        className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        className="table-action-button btn-edit"
                                                                         disabled={loadingFirebase || !isAuthReady}
                                                                     >
                                                                         編輯
                                                                     </button>
                                                                     <button
                                                                         onClick={() => { setShowConfirmDeleteDialog(true); setRecordToDelete(record.id); }}
-                                                                        className="bg-gray-400 hover:bg-gray-500 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        className="table-action-button btn-delete"
                                                                         disabled={loadingFirebase || !isAuthReady}
                                                                     >
                                                                         刪除
                                                                     </button>
                                                                     <button
                                                                         onClick={() => { setEditingRecordId(record.id); setCurrentPage('cashFlowSummary'); }}
-                                                                        className="bg-purple-500 hover:bg-purple-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        className="table-action-button btn-cashflow"
                                                                         disabled={loadingFirebase || !isAuthReady}
                                                                     >
                                                                         金流
                                                                     </button>
                                                                     <button
                                                                         onClick={() => { setEditingRecordId(record.id); setShowEventHistoryModal(true); }}
-                                                                        className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1 rounded-md transition duration-200"
+                                                                        className="table-action-button btn-event"
                                                                         disabled={loadingFirebase || !isAuthReady}
                                                                     >
                                                                         事件
@@ -2374,14 +2930,14 @@
                                         {/* Updated statistics display for filtered period */}
                                         <div className="mt-4 text-center text-lg font-bold">
                                             金流狀況 (結餘):
-                                            <span className={`ml-2 ${parseFloat(totalActualProfitAppLevelFiltered) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                            <span className={`ml-2 ${parseFloat(totalActualProfitAppLevelFiltered) >= 0 ? 'text-status-success' : 'text-status-failure'}`}>
                                                 {totalActualProfitAppLevelFiltered.toFixed(2)} NTD
                                             </span>
                                         </div>
-                                        <div className="mt-2 text-center text-base font-semibold text-gray-700">
-                                            總出款: <span className="text-blue-700">${(totalLoanAmountSumFiltered * -1).toFixed(2)} NTD</span> |
-                                            總淨利: <span className="text-blue-700">${totalActualProfitAppLevelFiltered.toFixed(2)} NTD</span> |
-                                            總客戶數: <span className="text-green-700">{totalCustomersFiltered}</span>
+                                        <div className="mt-2 text-center text-base font-semibold text-red-white-text-dark">
+                                            總出款: <span className="text-status-failure">${(totalLoanAmountSumFiltered * -1).toFixed(2)} NTD</span> |
+                                            總淨利: <span className={`${parseFloat(totalActualProfitAppLevelFiltered) >= 0 ? 'text-status-success' : 'text-status-failure'}`}>{totalActualProfitAppLevelFiltered.toFixed(2)} NTD</span> |
+                                            總客戶數: <span className="text-status-success">{totalCustomersFiltered}</span>
                                         </div>
                                     </>
                                 ) : (
@@ -2393,30 +2949,30 @@
                         )}
 
                         {currentPage === 'cashFlowSummary' && editingRecordId && (
-                            <div className="bg-white p-8 rounded-xl shadow-2xl w-full mb-8 transform transition-all duration-300 hover:scale-[1.01]">
-                                <h1 className="text-3xl font-extrabold text-gray-900 mb-6 text-center">
+                            <div className="card w-full mb-8">
+                                <h1 className="text-3xl font-extrabold text-red-white-text-dark mb-6 text-center">
                                     金流收支 (客戶: {transactionsHistory.find(rec => rec.id === editingRecordId)?.clientName})
                                 </h1>
 
                                 {/* Summary Statistics for Current Loan (Moved to top) */}
-                                <div className="mb-8 p-6 bg-blue-50 rounded-lg shadow-inner text-center">
-                                    <h2 className="text-xl font-semibold text-blue-800 mb-4">當前借款金流概覽</h2>
-                                    <div className="grid grid-cols-2 gap-4 text-lg font-bold text-gray-700">
+                                <div className="mb-8 p-6 bg-red-white-light rounded-lg shadow-inner text-center">
+                                    <h2 className="text-xl font-semibold text-red-white-primary mb-4">當前借款金流概覽</h2>
+                                    <div className="grid grid-cols-2 gap-4 text-lg font-bold text-red-white-text-dark">
                                         <div>
                                             <p>總出款金額:</p>
-                                            <span className="text-red-600 text-3xl">
+                                            <span className="text-status-failure text-3xl">
                                                 {(transactionsHistory.find(rec => rec.id === editingRecordId)?.loanAmount * -1 || 0).toFixed(2)} NTD
                                             </span>
                                         </div>
                                         <div>
                                             <p>金流收入:</p>
-                                            <span className="text-green-600 text-3xl">
+                                            <span className="text-status-success text-3xl">
                                                 {totalIncomingFromCashFlows.toFixed(2)} NTD
                                             </span>
                                         </div>
                                         <div className="col-span-2">
                                             <p>金流狀況 (淨額):</p>
-                                            <span className={`text-4xl ${parseFloat(currentCashFlowStatus) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                            <span className={`text-4xl ${parseFloat(currentCashFlowStatus) >= 0 ? 'text-red-white-primary' : 'text-status-failure'}`}>
                                                 {currentCashFlowStatus} NTD
                                             </span>
                                         </div>
@@ -2440,26 +2996,26 @@
 
                                 {/* Cash Flow History Table (Moved to top) */}
                                 <div className="mt-8">
-                                    <h2 className="text-xl font-extrabold text-gray-900 mb-4 text-center">金流紀錄列表</h2>
+                                    <h2 className="text-xl font-extrabold text-red-white-text-dark mb-4 text-center">金流紀錄列表</h2>
                                     {cashFlows.length > 0 ? (
                                         <div className="overflow-x-auto">
-                                            <table className="min-w-full bg-white rounded-lg shadow-md">
+                                            <table className="min-w-full">
                                                 <thead>
-                                                    <tr className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                                                        <th className="py-3 px-6 text-left">類型</th>
-                                                        <th className="py-3 px-6 text-left">日期</th>
-                                                        <th className="py-3 px-6 text-left">金額</th>
-                                                        <th className="py-3 px-6 text-left">名目</th>
-                                                        <th className="py-3 px-6 text-left">備註</th>
-                                                        <th className="py-3 px-6 text-left">操作</th>
+                                                    <tr>
+                                                        <th>類型</th>
+                                                        <th>日期</th>
+                                                        <th>金額</th>
+                                                        <th>名目</th>
+                                                        <th>備註</th>
+                                                        <th>操作</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="text-gray-600 text-sm font-light">
+                                                <tbody className="text-red-white-text-dark text-sm font-light">
                                                     {cashFlows.map(cf => (
                                                         <tr key={cf.id} className="border-b border-gray-200 hover:bg-gray-100">
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{cf.type}</td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{cf.date}</td>
-                                                            <td className={`py-3 px-6 text-left ${cf.type === '還款' ? 'text-green-600' : 'text-red-600'}`}>
+                                                            <td className={`py-3 px-6 text-left ${cf.type === '還款' ? 'text-status-success' : 'text-status-failure'}`}>
                                                                 {cf.amount.toFixed(2)}
                                                             </td>
                                                             <td className="py-3 px-6 text-left whitespace-nowrap">{cf.item}</td>
@@ -2485,12 +3041,12 @@
                                 </div>
 
                                 {/* Add New Cash Flow Record Form (Moved to top) */}
-                                <div className="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner mt-8">
-                                    <h2 className="text-xl font-semibold text-gray-800 mb-4">新增金流紀錄</h2>
+                                <div className="mb-8 p-6 bg-red-white-light rounded-lg shadow-inner mt-8">
+                                    <h2 className="text-xl font-semibold text-red-white-text-dark mb-4 text-center">新增金流紀錄</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                         {/* Removed Type dropdown and its custom input */}
                                         <div>
-                                            <label htmlFor="newCashFlowDate" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="newCashFlowDate" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 日期:
                                             </label>
                                             <input
@@ -2498,11 +3054,11 @@
                                                 id="newCashFlowDate"
                                                 value={newCashFlowDate}
                                                 onChange={(e) => setNewCashFlowDate(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             />
                                         </div>
                                         <div>
-                                            <label htmlFor="newCashFlowAmount" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="newCashFlowAmount" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 金額 (NTD):
                                             </label>
                                             <input
@@ -2511,18 +3067,18 @@
                                                 value={newCashFlowAmount}
                                                 onChange={(e) => setNewCashFlowAmount(e.target.value)}
                                                 placeholder="例如: 1000 (還款), -500 (出款)"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             />
                                         </div>
                                         <div>
-                                            <label htmlFor="newCashFlowItem" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="newCashFlowItem" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 名目:
                                             </label>
                                             <select
                                                 id="newCashFlowItem"
                                                 value={newCashFlowItem}
                                                 onChange={(e) => setNewCashFlowItem(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             >
                                                 {managedCashFlowItems.map(item => (
                                                     <option key={item} value={item}>{item}</option>
@@ -2535,12 +3091,12 @@
                                                     value={customCashFlowItemInput}
                                                     onChange={(e) => setCustomCashFlowItemInput(e.target.value)}
                                                     placeholder="輸入自訂名目"
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800 mt-2"
+                                                    className="w-full mt-2"
                                                 />
                                             )}
                                         </div>
                                         <div className="md:col-span-2">
-                                            <label htmlFor="newCashFlowNotes" className="block text-gray-700 text-sm font-semibold mb-2">
+                                            <label htmlFor="newCashFlowNotes" className="block text-red-white-text-dark text-sm font-semibold mb-2">
                                                 備註:
                                             </label>
                                             <textarea
@@ -2549,13 +3105,13 @@
                                                 onChange={(e) => setNewCashFlowNotes(e.target.value)}
                                                 placeholder="例如: 繳交第一期利息"
                                                 rows="2"
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out text-gray-800"
+                                                className="w-full"
                                             ></textarea>
                                         </div>
                                     </div>
                                     <button
                                         onClick={handleSaveCashFlowRecord}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75"
+                                        className="w-full btn-primary"
                                         disabled={loadingFirebase || !isAuthReady}
                                     >
                                         新增金流
@@ -2566,7 +3122,7 @@
                                 <div className="mt-8 text-center">
                                     <button
                                         onClick={() => setCurrentPage('clientList')}
-                                        className="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75"
+                                        className="btn-secondary"
                                     >
                                         返回客戶列表
                                     </button>
@@ -2588,19 +3144,19 @@
                     {/* Update Log Modal */}
                     {showUpdateLogModal && (
                         <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">更新紀錄</h2>
+                            <div className="card max-w-md w-full max-h-[80vh] overflow-y-auto">
+                                <h2 className="text-2xl font-bold text-red-white-text-dark mb-4 text-center">更新紀錄</h2>
                                 {versionHistoryData.map((v, i) => (
                                     <div key={v.version} className={`mb-4 pb-4 ${i < versionHistoryData.length - 1 ? 'border-b border-gray-200' : ''}`}>
-                                        <p className="text-lg font-semibold text-blue-700">版本: {v.version}</p>
+                                        <p className="text-lg font-semibold text-red-white-primary">版本: {v.version}</p>
                                         <p className="text-sm text-gray-500 mb-2">日期: {v.date}</p>
-                                        <p className="text-gray-700">{v.content}</p>
+                                        <p className="text-red-white-text-dark">{v.content}</p>
                                     </div>
                                 ))}
                                 <div className="text-center mt-4">
                                     <button
                                         onClick={() => setShowUpdateLogModal(false)}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200"
+                                        className="btn-primary"
                                     >
                                         關閉
                                     </button>
